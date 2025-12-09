@@ -7,62 +7,19 @@ Public Sub openPath(Path)
 CreateObject("Shell.Application").open CVar(Path)
 End Sub
 
-Public Function registerWdbUpdates(table As String, ID As Variant, column As String, oldVal As Variant, newVal As Variant, Optional tag0 As String = "", Optional tag1 As Variant = "")
-Dim sqlColumns As String, sqlValues As String
-
-If (VarType(oldVal) = vbDate) Then oldVal = Format(oldVal, "mm/dd/yyyy")
-If (VarType(newVal) = vbDate) Then newVal = Format(newVal, "mm/dd/yyyy")
-
-Dim rs1 As Recordset
-Set rs1 = CurrentDb().OpenRecordset("tblWdbUpdateTracking")
-
-If Len(oldVal) > 255 Then oldVal = Left(oldVal, 255)
-If Len(newVal) > 255 Then newVal = Left(newVal, 255)
-
-With rs1
-    .AddNew
-        !tableName = table
-        !tableRecordId = ID
-        !updatedBy = Environ("username")
-        !updatedDate = Now()
-        !columnName = column
-        !previousData = CStr(Nz(oldVal, ""))
-        !newData = CStr(Nz(newVal, ""))
-        !dataTag0 = tag0
-        !dataTag1 = tag1
-    .Update
-    .Bookmark = .lastModified
-End With
-
-rs1.Close
-Set rs1 = Nothing
-End Function
-
 Function emailContentGen(subject As String, Title As String, subTitle As String, primaryMessage As String, detail1 As String, detail2 As String, detail3 As String) As String
 emailContentGen = subject & "," & Title & "," & subTitle & "," & primaryMessage & "," & detail1 & "," & detail2 & "," & detail3
 End Function
 
-Function userData(data) As String
-
-Dim db As Database
-Set db = OpenDatabase("\\data\mdbdata\WorkingDB\build\Repo\WorkingDB_Connection\WorkingDB_Connection.accdb")
-
-Dim rsPermissions As Recordset
-Set rsPermissions = db.OpenRecordset("SELECT * from tblPermissions WHERE user = '" & Environ("username") & "'")
-userData = Nz(rsPermissions(data))
-rsPermissions.Close
-
-db.Close
-End Function
-
 Function getEmail(userName As String) As String
+On Error Resume Next
 
 Dim db As Database
-Set db = OpenDatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb")
+Set db = CurrentDb()
 
 Dim rsPermissions As Recordset
-Set rsPermissions = db.OpenRecordset("SELECT * from tblPermissions WHERE user = '" & userName & "'")
-getEmail = rsPermissions!userEmail
+Set rsPermissions = db.OpenRecordset("SELECT * from tblDeveloperInfo WHERE user = '" & userName & "'")
+getEmail = rsPermissions!Email
 rsPermissions.Close
 
 db.Close

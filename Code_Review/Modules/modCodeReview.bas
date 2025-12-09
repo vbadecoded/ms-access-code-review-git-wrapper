@@ -10,7 +10,7 @@ Dim sWorkingDirectory As String
 
 ' Set the working directory to your Git repository
 If dir = "current" Then
-    sWorkingDirectory = currentRepoLocation
+    sWorkingDirectory = Form__MAIN.cmdRepo
 Else
     sWorkingDirectory = dir
 End If
@@ -28,11 +28,13 @@ With CreateObject("WScript.Shell")
     .Run "cmd /c " & inputCmd & " > %temp%\tempgitoutput.txt", 0, True
 End With
 
+On Error Resume Next
 Dim strOutput
 With CreateObject("Scripting.FileSystemObject")
     strOutput = .OpenTextFile(Environ("temp") & "\tempgitoutput.txt").ReadAll()
     .DeleteFile Environ("temp") & "\tempgitoutput.txt"
 End With
+On Error GoTo 0
 
 Dim arr() As String
 arr = Split(strOutput, vbLf)
@@ -84,6 +86,67 @@ Set rs = Nothing ' Release the recordset object
 
 End Function
 
+Function recomposeAccdb(importTo As String)
+
+'---RECOMPOSE---
+Dim myComponent
+Dim sModuleType
+Dim sTempname
+Dim sOutstring
+
+Dim myPath, repo
+Dim fso As Object
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+importTo = "\\data\mdbdata\WorkingDB\build\WorkingDB_dev.accdb"
+fso.CopyFile "\\data\mdbdata\WorkingDB\prod-FE\WorkingDB_FE.accdb", importTo
+repo = "\\data\mdbdata\WorkingDB\build\Send\"
+myPath = fso.GetParentFolderName(importTo)
+
+addNote "starting Access..."
+Dim oApplication
+Set oApplication = CreateObject("Access.Application")
+addNote "opening " & importTo & " ..."
+oApplication.OpenCurrentDatabase importTo
+oApplication.runCommand acCmdCloseAll
+oApplication.CurrentDb.Properties("AllowByPassKey") = True
+
+Dim folder
+Set folder = fso.GetFolder(repo)
+
+Dim myFile, objectname, objecttype
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    Select Case objecttype
+        Case "form"
+        oApplication.LoadFromText acForm, objectname, myFile.Path
+        addNote objectname & " LOADED"
+        Case "bas"
+        oApplication.LoadFromText acModule, objectname, myFile.Path
+        addNote objectname & " LOADED"
+        Case "mod"
+        oApplication.LoadFromText acMacro, objectname, myFile.Path
+        addNote objectname & " LOADED"
+        Case "rpt"
+        oApplication.LoadFromText acReport, objectname, myFile.Path
+        addNote objectname & " LOADED"
+        Case "qry"
+        oApplication.LoadFromText acQuery, objectname, myFile.Path
+        addNote objectname & " LOADED"
+    End Select
+Next
+
+oApplication.runCommand acCmdCompileAndSaveAllModules
+oApplication.CloseCurrentDatabase
+oApplication.Quit
+
+addNote "Files Imported"
+
+End Function
+
 Function decomposeAccdb(sADPFilename As String, sExportPath As String)
 
 Dim fso As Object
@@ -94,7 +157,7 @@ myType = fso.GetExtensionName(sADPFilename)
 myName = fso.GetBaseName(sADPFilename)
 myPath = fso.GetParentFolderName(sADPFilename)
 
-sStubADPFilename = sExportPath & "\" & myName & "_stub." & myType
+sStubADPFilename = Environ("temp") & "\" & myName & "_stub." & myType
 addNote sStubADPFilename
 addNote "copy stub to " & sStubADPFilename & "..."
 fso.CopyFile sADPFilename, sStubADPFilename
@@ -108,6 +171,8 @@ Set dbT = accT.DBEngine.OpenDatabase(sStubADPFilename, False, False)
 dbT.Properties("AllowByPassKey") = True
 dbT.Close
 Set dbT = Nothing
+accT.Quit
+Set accT = Nothing
 
 Dim oApplication
 Set oApplication = CreateObject("Access.Application")
@@ -117,75 +182,75 @@ oApplication.Visible = False
 
 addNote "exporting..."
 Dim myObj
-    
 Dim delFold
 Dim delFile
 
 'delete all files
+addNote "  --Deleting Forms"
 If fso.FolderExists(sExportPath & "\Forms\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Forms\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting SubForms"
 If fso.FolderExists(sExportPath & "\Forms\SubForms\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Forms\SubForms\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting Modules"
 If fso.FolderExists(sExportPath & "\Modules\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Modules\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting Macros"
 If fso.FolderExists(sExportPath & "\Macros\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Macros\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting Reports"
 If fso.FolderExists(sExportPath & "\Reports\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Reports\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting SubReports"
 If fso.FolderExists(sExportPath & "\Reports\SubReports\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Reports\SubReports\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting Queries"
 If fso.FolderExists(sExportPath & "\Queries\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Queries\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+addNote "  --Deleting SubQueries"
 If fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then
     Set delFold = fso.GetFolder(sExportPath & "\Queries\SubQueries\")
     For Each delFile In delFold.Files
-        addNote "  " & delFile.Path
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
 End If
 
+Set delFile = Nothing
 Set delFold = Nothing
 
 '---FORMS---
@@ -232,10 +297,11 @@ For Each myObj In oApplication.CurrentDb.QueryDefs
     End If
 Next
 
+Set myObj = Nothing
 oApplication.CloseCurrentDatabase
 oApplication.Quit
-
-fso.DeleteFile sStubADPFilename
+Set oApplication = Nothing
+Set fso = Nothing
 
 MsgBox "Files Decomposed from " & sADPFilename, vbInformation, "Nicely Done"
 
@@ -249,6 +315,8 @@ DoCmd.SetWarnings True
 
 On Error Resume Next
 Form_frmTracking.Requery
+
+moveTrackingToLastRecord
 
 DoEvents
 

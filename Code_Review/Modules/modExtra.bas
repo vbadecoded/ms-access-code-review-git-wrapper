@@ -52,14 +52,3 @@ db.Close
 Set db = Nothing
 
 End Function
-
-Function currentRepoLocation() As String
-
-Dim fso
-Set fso = CreateObject("Scripting.FileSystemObject")
-
-currentRepoLocation = fso.GetParentFolderName(CurrentProject.Path) & "\"
-
-Set fso = Nothing
-
-End Function
