@@ -1,6 +1,24 @@
 Option Compare Database
 Option Explicit
 
+Function getDB() As String
+getDB = Form__MAIN.cmdRepo & Form__MAIN.cmdFrontEnd & "\" & Form__MAIN.cmdFrontEnd.column(2) & ".accdb"
+End Function
+
+Function shiftKeyBypass(location As String, toggle As Boolean) As Boolean
+shiftKeyBypass = False
+
+Dim db, acc
+Set acc = CreateObject("Access.Application")
+Set db = acc.DBEngine.OpenDatabase(location, False, False)
+db.Properties("AllowByPassKey") = toggle
+db.Close
+Set db = Nothing
+
+shiftKeyBypass = True
+exitFunction:
+End Function
+
 Function runGitCmd(inputCmd As String, Optional dir As String = "current") As String
 
 Dim wsShell As Object
@@ -255,9 +273,11 @@ Set delFold = Nothing
 
 '---FORMS---
 For Each myObj In oApplication.CurrentProject.AllForms
+    If Not fso.FolderExists(sExportPath & "\Forms\") Then MkDir (sExportPath & "\Forms\")
     addNote "  " & myObj.FullName
     'move all new files
     If Left(myObj.FullName, 1) = "s" Then
+        If Not fso.FolderExists(sExportPath & "\Forms\SubForms\") Then MkDir (sExportPath & "\Forms\SubForms\")
         oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\SubForms\" & myObj.FullName & ".form"
     Else
         oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\" & myObj.FullName & ".form"
@@ -266,19 +286,23 @@ Next
 
 '---MODULES---
 For Each myObj In oApplication.CurrentProject.AllModules
+    If Not fso.FolderExists(sExportPath & "\Modules\") Then MkDir (sExportPath & "\Modules\")
     addNote "  " & myObj.FullName
     oApplication.SaveAsText acModule, myObj.FullName, sExportPath & "\Modules\" & myObj.FullName & ".bas"
 Next
 
 For Each myObj In oApplication.CurrentProject.AllMacros
+    If Not fso.FolderExists(sExportPath & "\Macros\") Then MkDir (sExportPath & "\Macros\")
     addNote "  " & myObj.FullName
     oApplication.SaveAsText acMacro, myObj.FullName, sExportPath & "\Macros\" & myObj.FullName & ".mod"
 Next
 
 '---REPORTS---
 For Each myObj In oApplication.CurrentProject.AllReports
+    If Not fso.FolderExists(sExportPath & "\Reports\") Then MkDir (sExportPath & "\Reports\")
     addNote "  " & myObj.FullName
     If Left(myObj.FullName, 1) = "s" Then
+        If Not fso.FolderExists(sExportPath & "\Reports\SubReports\") Then MkDir (sExportPath & "\Reports\SubReports\")
         oApplication.SaveAsText acReport, myObj.FullName, sExportPath & "\Reports\SubReports\" & myObj.FullName & ".rpt"
     Else
         oApplication.SaveAsText acReport, myObj.FullName, sExportPath & "\Reports\" & myObj.FullName & ".rpt"
@@ -288,8 +312,10 @@ Next
 '---QUERIES---
 For Each myObj In oApplication.CurrentDb.QueryDefs
     If Not Left(myObj.Name, 3) = "~sq" Then 'exclude queries defined by the forms. Already included in the form itself
+        If Not fso.FolderExists(sExportPath & "\Queries\") Then MkDir (sExportPath & "\Queries\")
         addNote "  " & myObj.Name
         If Left(myObj.Name, 1) = "s" Then
+            If Not fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then MkDir (sExportPath & "\Queries\SubQueries\")
             oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
         Else
             oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
