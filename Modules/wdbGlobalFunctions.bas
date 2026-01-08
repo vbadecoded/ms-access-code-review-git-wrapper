@@ -4,7 +4,7 @@ Option Explicit
 Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hWnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal lpnShowCmd As Long) As Long
 
 Public Sub openPath(Path)
-CreateObject("Shell.Application").open CVar(Path)
+CreateObject("Shell.Application").Open CVar(Path)
 End Sub
 
 Function emailContentGen(subject As String, Title As String, subTitle As String, primaryMessage As String, detail1 As String, detail2 As String, detail3 As String) As String
