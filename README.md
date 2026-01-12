@@ -1,6 +1,3 @@
-# MS Access Code Review
-Access Database Git wrapper and code review system
-
 <H1 align="center">A VBA Decoded Project</H1>
 <p align="center">
   <img src="https://www.vbadecoded.com/images/logo.svg" width="200" />
