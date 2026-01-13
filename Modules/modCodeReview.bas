@@ -1,22 +1,75 @@
 Option Compare Database
 Option Explicit
 
+Function getRepoInfo(repoLocation) As Boolean
+getRepoInfo = False
+
+If Form__MAIN.trackRevisions Then
+    'grab lastest revision
+    addNote "Getting " & Form__MAIN.cmdRepo & " latest revision"
+    
+    Dim maxRel
+    maxRel = DMax("ID", Form__MAIN.revisionTableName, "databaseName = '" & Form__MAIN.cmdRepo.Column(2) & "'")
+    
+    Form__MAIN.releaseNum = DLookup("DatabaseVersion", Form__MAIN.revisionTableName, "ID = " & Nz(maxRel, 0))
+End If
+
+'find current branch
+Form__MAIN.gitbranch = runGitCmd("git branch --show-current")
+
+'list branches
+Form__MAIN.gitbranch.RowSource = Replace(Replace(runGitCmd("git branch"), vbLf, ";"), "*", "")
+Form__MAIN.gitBranchSelect.RowSource = Form__MAIN.gitbranch.RowSource
+
+Form__MAIN.publishChanges.Visible = Nz(Form__MAIN.cmdRepo.Column(1), "") <> ""
+
+DoCmd.SetWarnings False
+DoCmd.RunSQL "UPDATE tblLastUsed SET repoLocation = '" & repoLocation & "' WHERE recordId = 1"
+DoCmd.SetWarnings True
+
+getRepoInfo = True
+End Function
+
 Function getDB() As String
-getDB = Form__MAIN.cmdRepo & Form__MAIN.cmdFrontEnd & "\" & Form__MAIN.cmdFrontEnd.column(2) & ".accdb"
+getDB = Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2)
 End Function
 
 Function shiftKeyBypass(location As String, toggle As Boolean) As Boolean
 shiftKeyBypass = False
+On Error GoTo errEnableShift
 
-Dim db, acc
+'initialize variables
+Dim db As DAO.Database, acc
+Dim prop As DAO.Property
+Const conPropNotFound = 3270
+  
+'open the database as an Access object
 Set acc = CreateObject("Access.Application")
+
+'open the "database" now within that object
 Set db = acc.DBEngine.OpenDatabase(location, False, False)
-db.Properties("AllowByPassKey") = toggle
+
+'run the command
+db.Properties("AllowByPassKey") = True
+
+GoTo exitThis
+
+errEnableShift:
+If Err = conPropNotFound Then
+    Set prop = db.CreateProperty("AllowByPassKey", dbBoolean, toggle)
+    db.Properties.Append prop
+    Resume Next
+    GoTo exitThis
+End If
+
+MsgBox "Done!"
+
+exitThis: 'clear your objects/detach from the database
 db.Close
 Set db = Nothing
+Set acc = Nothing
 
 shiftKeyBypass = True
-exitFunction:
 End Function
 
 Function runGitCmd(inputCmd As String, Optional dir As String = "current") As String
@@ -116,10 +169,10 @@ Dim myPath, repo
 Dim fso As Object
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-importTo = "\\data\mdbdata\WorkingDB\build\WorkingDB_dev.accdb"
-fso.CopyFile "\\data\mdbdata\WorkingDB\prod-FE\WorkingDB_FE.accdb", importTo
+importTo = Form__MAIN.cmdRepo & "temp.accdb"
+fso.CopyFile Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2), importTo
 repo = "\\data\mdbdata\WorkingDB\build\Send\"
-myPath = fso.GetParentFolderName(importTo)
+myPath = fso.getparentfoldername(importTo)
 
 addNote "starting Access..."
 Dim oApplication
@@ -130,7 +183,7 @@ oApplication.runCommand acCmdCloseAll
 oApplication.CurrentDb.Properties("AllowByPassKey") = True
 
 Dim folder
-Set folder = fso.GetFolder(repo)
+Set folder = fso.getfolder(repo)
 
 Dim myFile, objectname, objecttype
 For Each myFile In folder.Files
@@ -173,7 +226,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Dim myType, myName, myPath, sStubADPFilename As String
 myType = fso.GetExtensionName(sADPFilename)
 myName = fso.GetBaseName(sADPFilename)
-myPath = fso.GetParentFolderName(sADPFilename)
+myPath = fso.getparentfoldername(sADPFilename)
 
 sStubADPFilename = Environ("temp") & "\" & myName & "_stub." & myType
 addNote sStubADPFilename
@@ -206,7 +259,7 @@ Dim delFile
 'delete all files
 addNote "  --Deleting Forms"
 If fso.FolderExists(sExportPath & "\Forms\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Forms\")
+    Set delFold = fso.getfolder(sExportPath & "\Forms\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -214,7 +267,7 @@ End If
 
 addNote "  --Deleting SubForms"
 If fso.FolderExists(sExportPath & "\Forms\SubForms\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Forms\SubForms\")
+    Set delFold = fso.getfolder(sExportPath & "\Forms\SubForms\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -222,7 +275,7 @@ End If
 
 addNote "  --Deleting Modules"
 If fso.FolderExists(sExportPath & "\Modules\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Modules\")
+    Set delFold = fso.getfolder(sExportPath & "\Modules\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -230,7 +283,7 @@ End If
 
 addNote "  --Deleting Macros"
 If fso.FolderExists(sExportPath & "\Macros\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Macros\")
+    Set delFold = fso.getfolder(sExportPath & "\Macros\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -238,7 +291,7 @@ End If
 
 addNote "  --Deleting Reports"
 If fso.FolderExists(sExportPath & "\Reports\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Reports\")
+    Set delFold = fso.getfolder(sExportPath & "\Reports\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -246,7 +299,7 @@ End If
 
 addNote "  --Deleting SubReports"
 If fso.FolderExists(sExportPath & "\Reports\SubReports\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Reports\SubReports\")
+    Set delFold = fso.getfolder(sExportPath & "\Reports\SubReports\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -254,7 +307,7 @@ End If
 
 addNote "  --Deleting Queries"
 If fso.FolderExists(sExportPath & "\Queries\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Queries\")
+    Set delFold = fso.getfolder(sExportPath & "\Queries\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -262,7 +315,7 @@ End If
 
 addNote "  --Deleting SubQueries"
 If fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then
-    Set delFold = fso.GetFolder(sExportPath & "\Queries\SubQueries\")
+    Set delFold = fso.getfolder(sExportPath & "\Queries\SubQueries\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -279,8 +332,10 @@ For Each myObj In oApplication.CurrentProject.AllForms
     If Left(myObj.FullName, 1) = "s" Then
         If Not fso.FolderExists(sExportPath & "\Forms\SubForms\") Then MkDir (sExportPath & "\Forms\SubForms\")
         oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\SubForms\" & myObj.FullName & ".form"
+        splitFormFile (sExportPath & "\Forms\SubForms\" & myObj.FullName & ".form")
     Else
         oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\" & myObj.FullName & ".form"
+        splitFormFile (sExportPath & "\Forms\" & myObj.FullName & ".form")
     End If
 Next
 
@@ -330,6 +385,36 @@ Set oApplication = Nothing
 Set fso = Nothing
 
 MsgBox "Files Decomposed from " & sADPFilename, vbInformation, "Nicely Done"
+
+End Function
+
+Function splitFormFile(fileLocation)
+
+Dim FileNum As Integer
+Dim DataLine As String
+Dim codeLine As Boolean
+codeLine = False
+
+Dim myFile As String
+myFile = Replace(fileLocation, ".form", ".bas")
+Open myFile For Output As #2 ' Open the file for output
+
+FileNum = FreeFile()
+Open fileLocation For Input As #1
+
+While Not EOF(FileNum)
+    Line Input #1, DataLine ' read in data 1 line at a time
+    
+    If codeLine Then
+        Print #2, DataLine
+    End If
+    
+    If DataLine = "CodeBehindForm" Then codeLine = True
+    
+Wend
+
+Close #1
+Close #2
 
 End Function
 
