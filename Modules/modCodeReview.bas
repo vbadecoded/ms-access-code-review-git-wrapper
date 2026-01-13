@@ -50,7 +50,7 @@ Set acc = CreateObject("Access.Application")
 Set db = acc.DBEngine.OpenDatabase(location, False, False)
 
 'run the command
-db.Properties("AllowByPassKey") = True
+db.Properties("AllowByPassKey") = toggle
 
 GoTo exitThis
 
