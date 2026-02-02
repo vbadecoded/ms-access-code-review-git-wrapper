@@ -399,7 +399,7 @@ Dim devBackup, devTemp, feFile
 
 '---Open DEV to finalize---
 '-if Front End
-If Me.cmdRepo = "workingdb" Then
+If Me.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
     addNote "Opening database for cleaning/compiling"
     Dim dbInput, dbInputRS As Database
     
