@@ -39,18 +39,6 @@ Call getRepoInfo(Me.cmdRepo)
 formStatus (False)
 End Sub
 
-Private Sub commitAll_Click()
-formStatus (True)
-
-'add all modified files
-Dim results As String
-
-addNote "git commit -a -m """ & Form__MAIN.releaseNotes & """"
-Call runGitCmd("git commit -a -m """ & Form__MAIN.releaseNotes & """")
-
-formStatus (False)
-End Sub
-
 Private Sub decompose_Click()
 formStatus (True)
 
@@ -83,6 +71,8 @@ End Sub
 
 Private Sub Form_Load()
 formStatus (True)
+
+Call setTheme(Me)
 
 'initial data based on environment variables
 Me.responsiblePerson = Environ("username")
@@ -203,48 +193,11 @@ End Sub
 Private Sub gitCommit_Click()
 formStatus (True)
 
-'add all modified files
-Dim results As String
-results = runGitCmd("git status")
+addNote "git commit -m """ & Me.releaseNotes & """"
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * from tblFiles"
-DoCmd.SetWarnings True
+Call runGitCmd("git commit -m """ & Me.releaseNotes & """")
 
-Dim arr() As String
-arr = Split(results, vbLf)
-DoCmd.SetWarnings False
-Dim item
-For Each item In arr
-    If InStr(item, "modified:") Then DoCmd.RunSQL "INSERT INTO tblFiles(location) VALUES('" & Trim(Replace(item, "modified:", "")) & " ')"
-Next item
-DoCmd.SetWarnings True
-DoCmd.OpenForm "frmFiles"
-Form_frmFiles.gitCmd = "git commit"
-
-formStatus (False)
-End Sub
-
-Private Sub gitDiff_Click()
-formStatus (True)
-'add all modified files
-Dim results As String
-results = runGitCmd("git status")
-
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * from tblFiles"
-DoCmd.SetWarnings True
-
-Dim arr() As String
-arr = Split(results, vbLf)
-DoCmd.SetWarnings False
-Dim item
-For Each item In arr
-    If InStr(item, "modified:") Then DoCmd.RunSQL "INSERT INTO tblFiles(location) VALUES('" & Trim(Replace(item, "modified:", "")) & " ')"
-Next item
-DoCmd.SetWarnings True
-DoCmd.OpenForm "frmFiles"
-Form_frmFiles.gitCmd = "git diff"
+Call Me.gitStatus_Click
 
 formStatus (False)
 End Sub
@@ -276,11 +229,33 @@ Call runGitCmd("git push origin " & Me.gitbranch)
 formStatus (False)
 End Sub
 
-Private Sub gitStatus_Click()
+Public Sub gitStatus_Click()
 formStatus (True)
 addNote "git status"
 
-Call runGitCmd("git status")
+'add all modified files
+Dim results As String
+results = runGitCmd("git status")
+
+DoCmd.SetWarnings False
+DoCmd.RunSQL "DELETE * from tblFiles"
+DoCmd.SetWarnings True
+
+Dim arr() As String
+arr = Split(results, vbLf)
+DoCmd.SetWarnings False
+Dim item, itemStatus As String
+For Each item In arr
+    If InStr(item, "Changes to be committed") Then itemStatus = "staged"
+    If InStr(item, "Changes not staged for commit") Then itemStatus = "unstaged"
+    If InStr(item, "Untracked files") Then itemStatus = "new"
+    If InStr(item, "modified:") Then
+        DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(item, "modified:", "")) & "','" & itemStatus & "')"
+    End If
+Next item
+DoCmd.SetWarnings True
+
+Me.frmFiles.Requery
 
 formStatus (False)
 End Sub
@@ -323,14 +298,62 @@ End Sub
 Function formStatus(inWork As Boolean)
 
 If inWork Then
-    Me.Detail.BackColor = RGB(50, 0, 0)
+    Me.Detail.BackColor = rgb(50, 0, 0)
 Else
-    Me.Detail.BackColor = RGB(38, 38, 38)
+    Me.Detail.BackColor = rgb(38, 38, 38)
 End If
 
 Me.codeRunning.Visible = inWork
 
 End Function
+
+Private Sub notifyDepartment_AfterUpdate()
+formStatus (True)
+
+Dim db As Database
+Dim rs As Recordset
+
+Set db = OpenDatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , True)
+Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE inactive = false AND dept = '" & Me.notifyDepartment & "'")
+
+Dim emails As String
+emails = ""
+
+Do While Not rs.EOF
+    emails = emails & rs!userEmail & "; "
+    rs.MoveNext
+Loop
+
+Call genEmail(strBCC:=emails, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
+
+rs.Close
+Set rs = Nothing
+Set db = Nothing
+
+addNote Me.notifyDepartment & " email generated"
+
+formStatus (False)
+End Sub
+
+Private Sub notifyUser_AfterUpdate()
+formStatus (True)
+
+Dim db As Database
+Dim rs As Recordset
+
+Set db = OpenDatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , True)
+Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE user = '" & Me.notifyUser & "'")
+
+Call genEmail(strTo:=rs!userEmail, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
+
+rs.Close
+Set rs = Nothing
+Set db = Nothing
+
+addNote Me.notifyUser & " email generated"
+
+formStatus (False)
+End Sub
 
 Private Sub openAccdb_Click()
 formStatus (True)
@@ -494,7 +517,7 @@ Private Sub publishNOTES_Click()
 formStatus (True)
 
 DoCmd.SetWarnings False
-DoCmd.RunSQL "INSERT INTO tblReleaseNotes" & _
+DoCmd.RunSQL "INSERT INTO " & Me.revisionTableName & _
     "(DatabaseVersion,Notes,ReleaseDate,ReleasedBy,DatabaseName)" & _
     " VALUES" & _
     "('" & Me.releaseNum & "','" & Me.releaseNotes & "','" & Date & "','" & Me.responsiblePerson & "','" & Me.cmdRepo.Column(2) & "');"
@@ -544,17 +567,15 @@ For Each item In arr
 Next item
 DoCmd.SetWarnings True
 
-'open form files
-DoCmd.OpenForm "frmFiles"
-Form_frmFiles.gitCmd = "Recompose"
-
 formStatus (False)
 End Sub
 
 Private Sub releaseHelp_Click()
 formStatus (True)
-DoCmd.OpenForm "frmHelp"
-addNote "Opened Help Form"
+
+FollowHyperlink "https://github.com/workingdb/workingdb?tab=contributing-ov-file"
+addNote "Opened Help Page"
+
 formStatus (False)
 End Sub
 
@@ -566,11 +587,32 @@ addNote "Populated User Email"
 formStatus (False)
 End Sub
 
-Private Sub runGit_Click()
+Private Sub stageChanged_Click()
 formStatus (True)
-addNote Me.gitCmd
+addNote "git add ."
 
-Call runGitCmd(Me.gitCmd)
+Call runGitCmd("git add .")
+
+formStatus (False)
+End Sub
+
+Private Sub trackRevisions_Click()
+formStatus (True)
+
+Dim vis As Boolean
+vis = Me.trackRevisions
+
+Me.Label196.Visible = vis
+Me.revisionTableName.Visible = vis
+Me.publishNOTES.Visible = vis
+Me.releaseNum.Visible = vis
+Me.Label67.Visible = vis
+Me.Command76.Visible = vis
+Me.increaseRev.Visible = vis
+Me.responsiblePerson.Visible = vis
+Me.lblResp.Visible = vis
+Me.respBackg.Visible = vis
+Me.userEmail.Visible = vis
 
 formStatus (False)
 End Sub

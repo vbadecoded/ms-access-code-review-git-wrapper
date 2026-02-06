@@ -5,44 +5,28 @@ Attribute VB_Exposed = False
 Option Compare Database
 Option Explicit
 
-Private Sub runCommand_Click()
+Private Sub location_Click()
+addNote "git diff " & Me.location
 
-If Me.Dirty Then Me.Dirty = False
+'add all modified files
+Dim results As String
+results = runGitCmd("git diff " & Trim(Me.location))
 
-Dim db As Database
-Set db = CurrentDb()
+DoCmd.SetWarnings False
+DoCmd.RunSQL "DELETE * from tblDiff"
+DoCmd.SetWarnings True
 
-Dim rs As Recordset
-Set rs = db.OpenRecordset("SELECT * FROM tblFiles WHERE selected = TRUE")
+Dim arr() As String
+arr = Split(results, vbLf)
+DoCmd.SetWarnings False
+Dim item
+For Each item In arr
+        DoCmd.RunSQL "INSERT INTO tblDiff(diffLine) VALUES('" & StrQuoteReplace(item) & "')"
+Next item
+DoCmd.SetWarnings True
 
-Dim fileList As String
-fileList = ""
-
-Do While Not rs.EOF
-    fileList = fileList & " " & Replace(Replace(rs!location, Chr(9), ""), Chr(32), "")
-    rs.MoveNext
-Loop
-
-
-Select Case Me.gitCmd
-    Case "git diff"
-        addNote "git diff "
-        Call runGitCmd("git diff" & fileList)
-    Case "git commit"
-        addNote "git add" & fileList
-        Call runGitCmd("git add" & fileList)
-        DoEvents
-        addNote "git commit -m """ & Form__MAIN.releaseNotes & """"
-        Call runGitCmd("git commit -m " & Form__MAIN.releaseNotes)
-    Case "recompose"
-        addNote "Recomposing Files"
-        Call recomposeAccdb(Form__MAIN.cmdRepo)
-End Select
-
-rs.Close
-Set rs = Nothing
-Set db = Nothing
-
+Form__MAIN.lblGitDiff.Caption = "Git Diff " & Me.location
+Form__MAIN.frmDiff.Requery
 End Sub
 
 Private Sub selectAll_Click()
@@ -51,6 +35,13 @@ DoCmd.SetWarnings False
 DoCmd.RunSQL "UPDATE tblFiles SET selected = TRUE"
 DoCmd.SetWarnings True
 Me.Requery
+
+End Sub
+
+Private Sub stage_Click()
+
+Call runGitCmd("git add " & Me.location)
+Call Form__MAIN.gitStatus_Click
 
 End Sub
 

@@ -1,7 +1,29 @@
 Option Compare Database
 Option Explicit
 
-Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hWnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal lpnShowCmd As Long) As Long
+Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal lpnShowCmd As Long) As Long
+
+Public Function genEmail(Optional ByVal strTo As String = "", Optional ByVal strBCC As String = "", Optional ByVal strCC As String = "", Optional ByVal strSubject As String = "", Optional body As String = "") As Boolean
+genEmail = False
+    
+Dim objEmail As Object
+
+Set objEmail = CreateObject("outlook.Application")
+Set objEmail = objEmail.CreateItem(0)
+
+With objEmail
+    .To = strTo
+    .CC = strCC
+    .BCC = strBCC
+    .subject = strSubject
+    .htmlBody = body
+    .display
+End With
+
+Set objEmail = Nothing
+
+genEmail = True
+End Function
 
 Public Sub openPath(Path)
 CreateObject("Shell.Application").Open CVar(Path)
