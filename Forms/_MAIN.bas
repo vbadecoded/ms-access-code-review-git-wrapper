@@ -35,6 +35,7 @@ Private Sub cmdRepo_AfterUpdate()
 formStatus (True)
 
 Call getRepoInfo(Me.cmdRepo)
+Call gitStatus_Click
 
 formStatus (False)
 End Sub
@@ -176,6 +177,8 @@ DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) values('Form Initialized')"
 DoCmd.SetWarnings True
 Me.sfrmTracking.Requery
 
+Call Me.gitStatus_Click
+
 formStatus (False)
 End Sub
 
@@ -184,6 +187,8 @@ formStatus (True)
 addNote "git checkout " & Me.gitbranch
 
 Call runGitCmd("git checkout " & Me.gitbranch)
+
+Call gitStatus_Click
 
 formStatus (False)
 End Sub
@@ -237,7 +242,11 @@ results = runGitCmd("git status")
 
 DoCmd.SetWarnings False
 DoCmd.RunSQL "DELETE * from tblFiles"
+DoCmd.RunSQL "DELETE * from tblDiff"
 DoCmd.SetWarnings True
+
+Dim fso As Object
+Set fso = CreateObject("Scripting.FileSystemObject")
 
 Dim arr() As String
 arr = Split(results, vbLf)
@@ -249,11 +258,18 @@ For Each ITEM In arr
     If InStr(ITEM, "Untracked files") Then itemStatus = "new"
     If InStr(ITEM, "modified:") Then
         DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & "','" & itemStatus & "')"
+    ElseIf itemStatus = "new" Then
+        If fso.FileExists(Me.cmdRepo & Replace(ITEM, Chr(9), "")) Then 'NEW file
+            DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & "','" & itemStatus & "')"
+        End If
     End If
 Next ITEM
 DoCmd.SetWarnings True
 
+Set fso = Nothing
+
 Me.sfrmFiles.Requery
+Me.sfrmDiff.Requery
 
 formStatus (False)
 End Sub
