@@ -42,9 +42,9 @@ Set db = CurrentDb()
 Dim rsPermissions As Recordset
 Set rsPermissions = db.OpenRecordset("SELECT * from tblDeveloperInfo WHERE user = '" & userName & "'")
 getEmail = rsPermissions!Email
-rsPermissions.Close
+rsPermissions.CLOSE
 
-db.Close
+db.CLOSE
 
 End Function
 

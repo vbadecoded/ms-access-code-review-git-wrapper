@@ -9,7 +9,6 @@ Declare PtrSafe Sub ChooseColor Lib "msaccess.exe" Alias "#53" (ByVal hwnd As Lo
 Public Function setTheme(setForm As Form)
 'this is not an error prone routine... but IF there are errors - this is not one I typically track in my production FEs.
 'Feel free to add error trapping to this though. Could we worthwhile.
-On Error Resume Next
 
 Dim colorLevArr() As String
 
@@ -71,7 +70,9 @@ Else 'if the theme only contains a primary color
 End If
 
 'set the form parts themes
+On Error Resume Next
 setForm.FormHeader.BackColor = colorLevels(findColorLevel(setForm.FormHeader.Tag))
+
 setForm.Detail.BackColor = colorLevels(findColorLevel(setForm.Detail.Tag))
 If Len(setForm.Detail.Tag) = 4 Then
     setForm.Detail.AlternateBackColor = colorLevels(findColorLevel(setForm.Detail.Tag) + 1)
@@ -80,12 +81,13 @@ Else
 End If
 
 setForm.FormFooter.BackColor = colorLevels(findColorLevel(setForm.FormFooter.Tag))
+If Err.Number = 2462 Then Err.Clear
 'NOTE - this does assume form parts don't use tags for other purposes
 
+On Error GoTo 0
 
 '---PRIMARY THEME SETTING AREA---
 'a giant For Each with Select Cases. Not rocket science.
-
 
 For Each ctl In setForm.Controls 'simply loop through all controls on the form
     If Not ctl.Tag Like "*.L#*" Then GoTo nextControl 'is there a tag with a theme attribute on it? if not - skip this control
@@ -186,9 +188,9 @@ For Each ctl In setForm.Controls 'simply loop through all controls on the form
             End If
             
             If ctl.FormatConditions.Count = 1 Then 'special case for null value conditional formatting. Typically this is used for placeholder values
-                If ctl.FormatConditions.item(0).Expression1 Like "*IsNull*" Then
-                    ctl.FormatConditions.item(0).BackColor = backCol
-                    ctl.FormatConditions.item(0).ForeColor = foreBase
+                If ctl.FormatConditions.ITEM(0).Expression1 Like "*IsNull*" Then
+                    ctl.FormatConditions.ITEM(0).BackColor = backCol
+                    ctl.FormatConditions.ITEM(0).ForeColor = foreBase
                 End If
             End If
         '---

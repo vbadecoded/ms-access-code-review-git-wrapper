@@ -24,7 +24,7 @@ Set db = CurrentDb()
 
 db.Execute "DELETE * from tblReleaseTracking"
 
-Me.frmTracking.Requery
+Me.sfrmTracking.Requery
 
 Set db = Nothing
 
@@ -72,8 +72,6 @@ End Sub
 Private Sub Form_Load()
 formStatus (True)
 
-Call setTheme(Me)
-
 'initial data based on environment variables
 Me.responsiblePerson = Environ("username")
 Me.userEmail = getEmail(Environ("username"))
@@ -85,9 +83,9 @@ Me.userEmail = getEmail(Environ("username"))
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 Dim db As Database
-Dim rsRepos As Recordset, rsFindRepo As Recordset
-
 Set db = CurrentDb()
+
+Dim rsRepos As Recordset, rsFindRepo As Recordset
 Set rsRepos = db.OpenRecordset("tblRepoLocation")
 
 'first delete all records in rsRepo
@@ -130,7 +128,7 @@ For Each sfo In sf
     
     If fsDBName = "" Then GoTo skipRepo 'no database found
     
-    rsRepos.AddNew
+    rsRepos.addNew
     rsRepos!repoLocation = sfo.Path & "\"
     rsRepos!dbName = fsDBName
     rsRepos!productionLocation = fsProdLocName
@@ -164,9 +162,9 @@ End If
 
 '---Cleanup---
 On Error Resume Next
-rsLU.Close: Set rsLU = Nothing
-rsFindRepo.Close: Set rsFindRepo = Nothing
-rsRepos.Close: Set rsRepos = Nothing
+rsLU.CLOSE: Set rsLU = Nothing
+rsFindRepo.CLOSE: Set rsFindRepo = Nothing
+rsRepos.CLOSE: Set rsRepos = Nothing
 Set db = Nothing
 
 Set fso = Nothing
@@ -176,7 +174,7 @@ DoCmd.SetWarnings False
 DoCmd.RunSQL "DELETE * FROM tblReleaseTracking"
 DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) values('Form Initialized')"
 DoCmd.SetWarnings True
-Me.frmTracking.Requery
+Me.sfrmTracking.Requery
 
 formStatus (False)
 End Sub
@@ -244,28 +242,28 @@ DoCmd.SetWarnings True
 Dim arr() As String
 arr = Split(results, vbLf)
 DoCmd.SetWarnings False
-Dim item, itemStatus As String
-For Each item In arr
-    If InStr(item, "Changes to be committed") Then itemStatus = "staged"
-    If InStr(item, "Changes not staged for commit") Then itemStatus = "unstaged"
-    If InStr(item, "Untracked files") Then itemStatus = "new"
-    If InStr(item, "modified:") Then
-        DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(item, "modified:", "")) & "','" & itemStatus & "')"
+Dim ITEM, itemStatus As String
+For Each ITEM In arr
+    If InStr(ITEM, "Changes to be committed") Then itemStatus = "staged"
+    If InStr(ITEM, "Changes not staged for commit") Then itemStatus = "unstaged"
+    If InStr(ITEM, "Untracked files") Then itemStatus = "new"
+    If InStr(ITEM, "modified:") Then
+        DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & "','" & itemStatus & "')"
     End If
-Next item
+Next ITEM
 DoCmd.SetWarnings True
 
-Me.frmFiles.Requery
+Me.sfrmFiles.Requery
 
 formStatus (False)
 End Sub
 
 Private Sub increaseRev_Click()
 formStatus (True)
-Dim x, Y, major, minor, min, newMajor, newMinor, newMin
+Dim X, Y, major, minor, min, newMajor, newMinor, newMin
 
-x = Me.releaseNum
-Y = Replace(x, "REV", "")
+X = Me.releaseNum
+Y = Replace(X, "REV", "")
 major = Split(Y, ".")(0)
 minor = Split(Y, ".")(1)
 min = Split(Y, ".")(2)
@@ -300,7 +298,7 @@ Function formStatus(inWork As Boolean)
 If inWork Then
     Me.Detail.BackColor = rgb(50, 0, 0)
 Else
-    Me.Detail.BackColor = rgb(38, 38, 38)
+    Call setTheme(Me)
 End If
 
 Me.codeRunning.Visible = inWork
@@ -326,7 +324,7 @@ Loop
 
 Call genEmail(strBCC:=emails, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
 
-rs.Close
+rs.CLOSE
 Set rs = Nothing
 Set db = Nothing
 
@@ -346,7 +344,7 @@ Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE user = '" & Me.not
 
 Call genEmail(strTo:=rs!userEmail, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
 
-rs.Close
+rs.CLOSE
 Set rs = Nothing
 Set db = Nothing
 
@@ -374,6 +372,15 @@ Call runGitCmd("git gui")
 formStatus (False)
 End Sub
 
+Private Sub openThemeEditor_Click()
+formStatus (True)
+addNote "open theme editor"
+
+DoCmd.OpenForm "frmThemeEditor"
+
+formStatus (False)
+End Sub
+
 Private Sub publishChanges_Click()
 formStatus (True)
 
@@ -390,11 +397,11 @@ Dim errorMsg As New Collection
 If Nz(Me.releaseNotes, "") = "" Then errorMsg.Add "Empty release notes"
 
 If errorMsg.Count > 0 Then
-    Dim msgContents As String, item
+    Dim msgContents As String, ITEM
     msgContents = ""
-    For Each item In errorMsg
-        msgContents = msgContents & vbNewLine & item
-    Next item
+    For Each ITEM In errorMsg
+        msgContents = msgContents & vbNewLine & ITEM
+    Next ITEM
     MsgBox msgContents, vbInformation, "Please fix these issues: "
     GoTo exitThis
 End If
@@ -430,7 +437,7 @@ If Me.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
     dbInputRS.Execute "DELETE FROM tblPLM"
     dbInputRS.Execute "Delete * from tblSessionVariables"
     dbInputRS.Execute "Update [tblDBinfo] SET [Release] = '" & TempVars!releaseNum & "' WHERE [ID] = 1"
-    dbInputRS.Close
+    dbInputRS.CLOSE
     Set dbInputRS = Nothing
     
     Set dbInput = CreateObject("Access.Application")
@@ -561,10 +568,10 @@ DoCmd.SetWarnings True
 Dim arr() As String
 arr = Split(results, vbLf)
 DoCmd.SetWarnings False
-Dim item
-For Each item In arr
-    If InStr(item, "modified:") Then DoCmd.RunSQL "INSERT INTO tblFiles(location) VALUES('" & Trim(Replace(item, "modified:", "")) & " ')"
-Next item
+Dim ITEM
+For Each ITEM In arr
+    If InStr(ITEM, "modified:") Then DoCmd.RunSQL "INSERT INTO tblFiles(location) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & " ')"
+Next ITEM
 DoCmd.SetWarnings True
 
 formStatus (False)

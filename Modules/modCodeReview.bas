@@ -65,7 +65,7 @@ End If
 MsgBox "Done!"
 
 exitThis: 'clear your objects/detach from the database
-db.Close
+db.CLOSE
 Set db = Nothing
 Set acc = Nothing
 
@@ -110,15 +110,15 @@ On Error GoTo 0
 Dim arr() As String
 arr = Split(strOutput, vbLf)
 
-Dim item
-For Each item In arr
+Dim ITEM
+For Each ITEM In arr
     DoCmd.SetWarnings False
-    DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(item) & " ')"
+    DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(ITEM) & " ')"
     DoCmd.SetWarnings True
-Next item
+Next ITEM
 
 On Error Resume Next
-Form_frmTracking.Requery
+Form_sfrmTracking.Requery
 
 moveTrackingToLastRecord
 
@@ -135,12 +135,12 @@ Dim rs As DAO.Recordset
 Dim lNumRec As Long
 Dim lNoRecOnForm As Long
 
-Set rs = Form_frmTracking.RecordsetClone ' Create a clone of the form's recordset
+Set rs = Form_sfrmTracking.RecordsetClone ' Create a clone of the form's recordset
 rs.MoveLast ' Move to the last record in the recordset
 lNumRec = rs.RecordCount ' Get the total number of records
 
 ' Calculate how many records are visible on the form
-lNoRecOnForm = Int(Form_frmTracking.InsideHeight / Form_frmTracking.Section(acDetail).Height)
+lNoRecOnForm = Int(Form_sfrmTracking.InsideHeight / Form_sfrmTracking.Section(acDetail).Height)
 
 ' Move the recordset to position the last visible record at the bottom
 If lNumRec > lNoRecOnForm Then
@@ -150,8 +150,8 @@ Else
     rs.MoveFirst ' If fewer records than can be displayed, go to the first
 End If
 
-Form_frmTracking.Bookmark = rs.Bookmark ' Set the form's bookmark to the calculated position
-Form_frmTracking.Refresh
+Form_sfrmTracking.Bookmark = rs.Bookmark ' Set the form's bookmark to the calculated position
+Form_sfrmTracking.Refresh
 
 Set rs = Nothing ' Release the recordset object
 
@@ -240,7 +240,7 @@ Set accT = CreateObject("Access.Application")
 Set dbT = accT.DBEngine.OpenDatabase(sStubADPFilename, False, False)
 
 dbT.Properties("AllowByPassKey") = True
-dbT.Close
+dbT.CLOSE
 Set dbT = Nothing
 accT.Quit
 Set accT = Nothing
@@ -425,7 +425,7 @@ DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(n
 DoCmd.SetWarnings True
 
 On Error Resume Next
-Form_frmTracking.Requery
+Form_sfrmTracking.Requery
 
 moveTrackingToLastRecord
 
