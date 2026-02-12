@@ -1,6 +1,138 @@
 Option Compare Database
 Option Explicit
 
+Function cleanDatabase() As Boolean
+
+cleanDatabase = False
+
+Dim errorMsg As New Collection, fso As Object
+If Nz(Form__MAIN.releaseNotes, "") = "" Then errorMsg.Add "Empty release notes"
+
+If errorMsg.Count > 0 Then
+    Dim msgContents As String, ITEM
+    msgContents = ""
+    For Each ITEM In errorMsg
+        msgContents = msgContents & vbNewLine & ITEM
+    Next ITEM
+    MsgBox msgContents, vbInformation, "Please fix these issues: "
+    GoTo exitThis
+End If
+
+If MsgBox("Are you sure? ", vbYesNo, "Just Checking") = vbNo Then GoTo exitThis
+
+addNote "--- STARTING " & Form__MAIN.cmdRepo.Column(2) & " CLEANING PROCEDURE ---"
+
+'---Setup Variables
+addNote "establishing variables..."
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+TempVars.Add "releaseNum", Form__MAIN.releaseNum.Value
+TempVars.Add "releaseNotes", Replace(Form__MAIN.releaseNotes.Value, "'", "''")
+TempVars.Add "responsiblePerson", Form__MAIN.responsiblePerson.Value
+TempVars.Add "userEmail", Form__MAIN.userEmail.Value
+TempVars.Add "databaseName", Form__MAIN.cmdRepo.Column(2)
+
+Dim repoLoc As String
+repoLoc = Form__MAIN.cmdRepo
+TempVars.Add "devFile", getDB
+
+Dim devBackup, devTemp, feFile
+
+'---Open DEV to finalize---
+'-if Front End
+If Form__MAIN.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
+    addNote "Opening database for cleaning/compiling"
+    Dim dbInput, dbInputRS As Database
+    
+    Set dbInputRS = OpenDatabase(TempVars!devFile)
+    dbInputRS.Execute "DELETE FROM tblPLM"
+    dbInputRS.Execute "Delete * from tblSessionVariables"
+    dbInputRS.Execute "Update [tblDBinfo] SET [Release] = '" & TempVars!releaseNum & "' WHERE [ID] = 1"
+    dbInputRS.CLOSE
+    Set dbInputRS = Nothing
+    
+    Set dbInput = CreateObject("Access.Application")
+    dbInput.OpenCurrentDatabase TempVars!devFile
+    dbInput.runCommand acCmdCloseAll
+    
+    Dim checkThis
+    Do
+        checkThis = dbInput.Run("readyForPublish")
+    Loop Until checkThis = True
+    
+    dbInput.CloseCurrentDatabase
+    dbInput.Quit
+    
+    Dim BEbackup
+    TempVars.Add "dbLoc", "\\data\mdbdata\WorkingDB\"
+    BEbackup = TempVars!dbLoc & "_backups\prod-BE\"
+    
+    addNote "Backup backends"
+    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE.accdb")
+    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ChangePointE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ChangePointE.accdb")
+    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_DesignE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_DesignE.accdb")
+    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ProjectE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ProjectE.accdb")
+    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_Sales.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_Sales.accdb")
+End If
+
+addNote "Enable Shift Bypass"
+
+'---Enable Shift---
+Call shiftKeyBypass(TempVars!devFile, True)
+
+'---Decompile---
+addNote "Decompile"
+MsgBox "Hold shift as you click OK - then close the database", vbInformation, "Up Next"
+openPath (repoLoc & "decompile.cmd")
+MsgBox "Once the database is closed, then click OK", vbInformation, "Up Next"
+
+'---Compact / Repair Dev into Temp---
+addNote "Compacting dev into temp file"
+
+TempVars.Add "devTemp", repoLoc & "temp.accdb"
+Application.compactRepair TempVars!devFile, TempVars!devTemp
+fso.DeleteFile (TempVars!devFile)
+
+'---Compile Temp File---
+addNote "Compile"
+Dim dbTemp
+Set dbTemp = CreateObject("Access.Application")
+MsgBox "Hold shift as you click OK", vbInformation, "Up Next"
+dbTemp.OpenCurrentDatabase TempVars!devTemp
+dbTemp.Visible = False
+dbTemp.runCommand acCmdCloseAll
+
+Dim compileMe
+Set compileMe = dbTemp.VBE.CommandBars.FindControl(msoControlButton, 578)
+If compileMe.Enabled Then compileMe.Execute
+
+dbTemp.runCommand acCmdCompileAndSaveAllModules
+dbTemp.CurrentDb.Properties("AllowByPassKey") = True
+If fso.FolderExists("H:\wdbBackups\") = False Then MkDir ("H:\wdbBackups\")
+addNote "Backup temp into homedrive"
+devBackup = "H:\wdbBackups\WorkingDB_Dev_backup.accdb"
+Call fso.CopyFile(TempVars!devTemp, devBackup)
+
+addNote "Disable shift bypass"
+dbTemp.CurrentDb.Properties("AllowByPassKey") = False
+addNote "Close temp file"
+dbTemp.CloseCurrentDatabase
+dbTemp.Quit
+DoEvents
+
+'---Compact Temp into Dev---
+addNote "Compacting temp file back into FE"
+Application.compactRepair TempVars!devTemp, TempVars!devFile
+fso.DeleteFile (TempVars!devTemp)
+
+addNote Form__MAIN.cmdRepo.Column(2) & " CLEANED"
+
+cleanDatabase = True
+exitThis:
+
+End Function
+
 Function getRepoInfo(repoLocation) As Boolean
 getRepoInfo = False
 
@@ -72,7 +204,7 @@ Set acc = Nothing
 shiftKeyBypass = True
 End Function
 
-Function runGitCmd(inputCmd As String, Optional dir As String = "current") As String
+Function runGitCmd(inputCmd As String, Optional dir As String = "current", Optional printAll As Boolean = True) As String
 
 Dim wsShell As Object
 Dim execObject As Object
@@ -107,15 +239,24 @@ With CreateObject("Scripting.FileSystemObject")
 End With
 On Error GoTo 0
 
+
 Dim arr() As String
 arr = Split(strOutput, vbLf)
 
-Dim ITEM
+Dim ITEM, startChanges As Boolean
+startChanges = False
+
+DoCmd.SetWarnings False
 For Each ITEM In arr
-    DoCmd.SetWarnings False
+    If ITEM = "" Then startChanges = True
+    
+    If startChanges = True And printAll = False Then GoTo noPrint
     DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(ITEM) & " ')"
-    DoCmd.SetWarnings True
+    
 Next ITEM
+
+noPrint:
+DoCmd.SetWarnings True
 
 On Error Resume Next
 Form_sfrmTracking.Requery

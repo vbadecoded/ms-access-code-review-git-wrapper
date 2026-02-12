@@ -29,27 +29,9 @@ Form__MAIN.lblGitDiff.Caption = "Git Diff " & Me.location
 Form__MAIN.sfrmDiff.Requery
 End Sub
 
-Private Sub selectAll_Click()
-
-DoCmd.SetWarnings False
-DoCmd.RunSQL "UPDATE tblFiles SET selected = TRUE"
-DoCmd.SetWarnings True
-Me.Requery
-
-End Sub
-
 Private Sub stage_Click()
 
 Call runGitCmd("git add " & Me.location)
 Call Form__MAIN.gitStatus_Click
-
-End Sub
-
-Private Sub unSelectAll_Click()
-
-DoCmd.SetWarnings False
-DoCmd.RunSQL "UPDATE tblFiles SET selected = False"
-DoCmd.SetWarnings True
-Me.Requery
 
 End Sub

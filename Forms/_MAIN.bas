@@ -5,16 +5,17 @@ Attribute VB_Exposed = False
 Option Compare Database
 Option Explicit
 
-Const acCmdCloseAll = &H286
-Const acCmdCompileAndSaveAllModules = &H7E
-Const msoControlButton = 1
-Const acForm = 2
-Const acModule = 5
-Const acMacro = 4
-Const acReport = 3
-Const acQuery = 1
-
 Dim fso As Object
+
+Private Sub cleanAndDecompose_Click()
+formStatus (True)
+
+If Not cleanDatabase Then Exit Sub
+DoEvents
+Call decomposeAccdb(Form__MAIN.cmdRepo & Me.cmdRepo.Column(2), Form__MAIN.cmdRepo)
+
+formStatus (False)
+End Sub
 
 Private Sub clearLog_Click()
 formStatus (True)
@@ -40,16 +41,32 @@ Call gitStatus_Click
 formStatus (False)
 End Sub
 
-Private Sub decompose_Click()
+Private Sub createAccde_Click()
 formStatus (True)
 
 Dim filePath As String
-Dim fileName As String
+Dim oldName As String, newName As String
 
 filePath = Form__MAIN.cmdRepo
-fileName = Me.cmdRepo.Column(2)
+oldName = Me.cmdRepo.Column(2)
+newName = Left(oldName, Len(oldName) - 1) & "e"
 
-Call decomposeAccdb(filePath & fileName, filePath)
+Dim oAccess As Object
+
+Set oAccess = CreateObject("Access.Application")
+oAccess.AutomationSecurity = 1
+oAccess.SysCmd 603, filePath & oldName, filePath & newName
+Set oAccess = Nothing
+
+addNote "Compiled Version Created: " & filePath & newName
+
+formStatus (False)
+End Sub
+
+Private Sub decompose_Click()
+formStatus (True)
+
+Call decomposeAccdb(Form__MAIN.cmdRepo & Me.cmdRepo.Column(2), Form__MAIN.cmdRepo)
 
 formStatus (False)
 End Sub
@@ -173,6 +190,8 @@ Set fso = Nothing
 
 DoCmd.SetWarnings False
 DoCmd.RunSQL "DELETE * FROM tblReleaseTracking"
+DoCmd.RunSQL "DELETE * from tblFiles"
+DoCmd.RunSQL "DELETE * from tblDiff"
 DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) values('Form Initialized')"
 DoCmd.SetWarnings True
 Me.sfrmTracking.Requery
@@ -184,10 +203,10 @@ End Sub
 
 Private Sub gitbranch_AfterUpdate()
 formStatus (True)
+
 addNote "git checkout " & Me.gitbranch
 
 Call runGitCmd("git checkout " & Me.gitbranch)
-
 Call gitStatus_Click
 
 formStatus (False)
@@ -197,9 +216,7 @@ Private Sub gitCommit_Click()
 formStatus (True)
 
 addNote "git commit -m """ & Me.releaseNotes & """"
-
 Call runGitCmd("git commit -m """ & Me.releaseNotes & """")
-
 Call Me.gitStatus_Click
 
 formStatus (False)
@@ -207,8 +224,8 @@ End Sub
 
 Private Sub gitMerge_Click()
 formStatus (True)
-addNote "git merge " & Me.gitBranchSelect
 
+addNote "git merge " & Me.gitBranchSelect
 Call runGitCmd("git merge " & Me.gitBranchSelect)
 
 formStatus (False)
@@ -216,8 +233,8 @@ End Sub
 
 Private Sub gitPull_Click()
 formStatus (True)
-addNote "git pull origin " & Me.gitbranch
 
+addNote "git pull origin " & Me.gitbranch
 Call runGitCmd("git pull origin " & Me.gitbranch)
 
 formStatus (False)
@@ -225,8 +242,8 @@ End Sub
 
 Private Sub gitPush_Click()
 formStatus (True)
-addNote "git push origin " & Me.gitbranch
 
+addNote "git push origin " & Me.gitbranch
 Call runGitCmd("git push origin " & Me.gitbranch)
 
 formStatus (False)
@@ -234,11 +251,12 @@ End Sub
 
 Public Sub gitStatus_Click()
 formStatus (True)
+
 addNote "git status"
 
 'add all modified files
 Dim results As String
-results = runGitCmd("git status")
+results = runGitCmd("git status", printAll:=False)
 
 DoCmd.SetWarnings False
 DoCmd.RunSQL "DELETE * from tblFiles"
@@ -276,6 +294,7 @@ End Sub
 
 Private Sub increaseRev_Click()
 formStatus (True)
+
 Dim X, Y, major, minor, min, newMajor, newMinor, newMin
 
 X = Me.releaseNum
@@ -306,6 +325,7 @@ Dim newRel As String
 newRel = "REV" & newMajor & "." & newMinor & "." & newMin
 Me.releaseNum = newRel
 addNote "Rev Increased to " & newRel
+
 formStatus (False)
 End Sub
 
@@ -373,7 +393,6 @@ Private Sub openAccdb_Click()
 formStatus (True)
 
 Call openPath(getDB)
-
 addNote Me.cmdRepo.Column(2) & " Opened"
 
 formStatus (False)
@@ -381,8 +400,8 @@ End Sub
 
 Private Sub openGitGUI_Click()
 formStatus (True)
-addNote "git gui"
 
+addNote "git gui"
 Call runGitCmd("git gui")
 
 formStatus (False)
@@ -390,6 +409,7 @@ End Sub
 
 Private Sub openThemeEditor_Click()
 formStatus (True)
+
 addNote "open theme editor"
 
 DoCmd.OpenForm "frmThemeEditor"
@@ -409,130 +429,8 @@ End Sub
 Private Sub publishFE_Click()
 formStatus (True)
 
-Dim errorMsg As New Collection
-If Nz(Me.releaseNotes, "") = "" Then errorMsg.Add "Empty release notes"
+Call cleanDatabase
 
-If errorMsg.Count > 0 Then
-    Dim msgContents As String, ITEM
-    msgContents = ""
-    For Each ITEM In errorMsg
-        msgContents = msgContents & vbNewLine & ITEM
-    Next ITEM
-    MsgBox msgContents, vbInformation, "Please fix these issues: "
-    GoTo exitThis
-End If
-
-If MsgBox("Are you sure? ", vbYesNo, "Just Checking") = vbNo Then GoTo exitThis
-
-addNote "--- STARTING " & Me.cmdRepo.Column(2) & " CLEANING PROCEDURE ---"
-
-'---Setup Variables
-addNote "establishing variables..."
-
-Set fso = CreateObject("Scripting.FileSystemObject")
-
-TempVars.Add "releaseNum", Me.releaseNum.Value
-TempVars.Add "releaseNotes", Replace(Me.releaseNotes.Value, "'", "''")
-TempVars.Add "responsiblePerson", Me.responsiblePerson.Value
-TempVars.Add "userEmail", Me.userEmail.Value
-TempVars.Add "databaseName", Me.cmdRepo.Column(2)
-
-Dim repoLoc As String
-repoLoc = Form__MAIN.cmdRepo
-TempVars.Add "devFile", getDB
-
-Dim devBackup, devTemp, feFile
-
-'---Open DEV to finalize---
-'-if Front End
-If Me.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
-    addNote "Opening database for cleaning/compiling"
-    Dim dbInput, dbInputRS As Database
-    
-    Set dbInputRS = OpenDatabase(TempVars!devFile)
-    dbInputRS.Execute "DELETE FROM tblPLM"
-    dbInputRS.Execute "Delete * from tblSessionVariables"
-    dbInputRS.Execute "Update [tblDBinfo] SET [Release] = '" & TempVars!releaseNum & "' WHERE [ID] = 1"
-    dbInputRS.CLOSE
-    Set dbInputRS = Nothing
-    
-    Set dbInput = CreateObject("Access.Application")
-    dbInput.OpenCurrentDatabase TempVars!devFile
-    dbInput.runCommand acCmdCloseAll
-    
-    Dim checkThis
-    Do
-        checkThis = dbInput.Run("readyForPublish")
-    Loop Until checkThis = True
-    
-    dbInput.CloseCurrentDatabase
-    dbInput.Quit
-    
-    Dim BEbackup
-    TempVars.Add "dbLoc", "\\data\mdbdata\WorkingDB\"
-    BEbackup = TempVars!dbLoc & "_backups\prod-BE\"
-    
-    addNote "Backup backends"
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ChangePointE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ChangePointE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_DesignE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_DesignE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ProjectE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ProjectE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_Sales.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_Sales.accdb")
-End If
-
-addNote "Enable Shift Bypass"
-
-'---Enable Shift---
-Call shiftKeyBypass(TempVars!devFile, True)
-
-'---Decompile---
-addNote "Decompile"
-MsgBox "Hold shift as you click OK - then close the database", vbInformation, "Up Next"
-openPath (repoLoc & "decompile.cmd")
-MsgBox "Once the database is closed, then click OK", vbInformation, "Up Next"
-
-'---Compact / Repair Dev into Temp---
-addNote "Compacting dev into temp file"
-
-TempVars.Add "devTemp", repoLoc & "temp.accdb"
-Application.compactRepair TempVars!devFile, TempVars!devTemp
-fso.DeleteFile (TempVars!devFile)
-
-'---Compile Temp File---
-addNote "Compile"
-Dim dbTemp
-Set dbTemp = CreateObject("Access.Application")
-MsgBox "Hold shift as you click OK", vbInformation, "Up Next"
-dbTemp.OpenCurrentDatabase TempVars!devTemp
-dbTemp.Visible = False
-dbTemp.runCommand acCmdCloseAll
-
-Dim compileMe
-Set compileMe = dbTemp.VBE.CommandBars.FindControl(msoControlButton, 578)
-If compileMe.Enabled Then compileMe.Execute
-
-dbTemp.runCommand acCmdCompileAndSaveAllModules
-dbTemp.CurrentDb.Properties("AllowByPassKey") = True
-If fso.FolderExists("H:\wdbBackups\") = False Then MkDir ("H:\wdbBackups\")
-addNote "Backup temp into homedrive"
-devBackup = "H:\wdbBackups\WorkingDB_Dev_backup.accdb"
-Call fso.CopyFile(TempVars!devTemp, devBackup)
-
-addNote "Disable shift bypass"
-dbTemp.CurrentDb.Properties("AllowByPassKey") = False
-addNote "Close temp file"
-dbTemp.CloseCurrentDatabase
-dbTemp.Quit
-DoEvents
-
-'---Compact Temp into Dev---
-addNote "Compacting temp file back into FE"
-Application.compactRepair TempVars!devTemp, TempVars!devFile
-fso.DeleteFile (TempVars!devTemp)
-
-addNote Me.cmdRepo.Column(2) & " CLEANED"
-
-exitThis:
 formStatus (False)
 End Sub
 
@@ -604,9 +502,11 @@ End Sub
 
 Private Sub responsiblePerson_AfterUpdate()
 formStatus (True)
+
 If Me.Dirty Then Me.Dirty = False
 Me.userEmail = getEmail(Me.responsiblePerson)
 addNote "Populated User Email"
+
 formStatus (False)
 End Sub
 
@@ -615,6 +515,7 @@ formStatus (True)
 addNote "git add ."
 
 Call runGitCmd("git add .")
+Call gitStatus_Click
 
 formStatus (False)
 End Sub
