@@ -33,7 +33,7 @@ Set db = acc.DBEngine.OpenDatabase("C:\workingdb\WorkingDB_ghost.accdb", False, 
 
 db.Properties("AllowByPassKey") = True
 
-db.CLOSE
+db.Close
 Set db = Nothing
 
 End Function
@@ -51,9 +51,9 @@ Do While Not rs.EOF
     rs.MoveNext
 Loop
 
-rs.CLOSE
+rs.Close
 Set rs = Nothing
-db.CLOSE
+db.Close
 Set db = Nothing
 
 End Function

@@ -12,6 +12,7 @@ formStatus (True)
 
 If Not cleanDatabase Then Exit Sub
 DoEvents
+MsgBox "Hold shift as you click OK", vbInformation, "Go on"
 Call decomposeAccdb(Form__MAIN.cmdRepo & Me.cmdRepo.Column(2), Form__MAIN.cmdRepo)
 
 formStatus (False)
@@ -180,9 +181,9 @@ End If
 
 '---Cleanup---
 On Error Resume Next
-rsLU.CLOSE: Set rsLU = Nothing
-rsFindRepo.CLOSE: Set rsFindRepo = Nothing
-rsRepos.CLOSE: Set rsRepos = Nothing
+rsLU.Close: Set rsLU = Nothing
+rsFindRepo.Close: Set rsFindRepo = Nothing
+rsRepos.Close: Set rsRepos = Nothing
 Set db = Nothing
 
 Set fso = Nothing
@@ -360,7 +361,7 @@ Loop
 
 Call genEmail(strBCC:=emails, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
 
-rs.CLOSE
+rs.Close
 Set rs = Nothing
 Set db = Nothing
 
@@ -380,7 +381,7 @@ Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE user = '" & Me.not
 
 Call genEmail(strTo:=rs!userEmail, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
 
-rs.CLOSE
+rs.Close
 Set rs = Nothing
 Set db = Nothing
 

@@ -3,6 +3,29 @@ Option Explicit
 
 Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal lpnShowCmd As Long) As Long
 
+Function ToJson(ByVal dict As Object) As String
+    Dim key As Variant, result As String, value As String
+
+    result = "{"
+    For Each key In dict.Keys
+        result = result & IIf(Len(result) > 1, ",", "")
+
+        If TypeName(dict(key)) = "Dictionary" Then
+            value = ToJson(dict(key))
+            ToJson = value
+        Else
+            value = """" & dict(key) & """"
+        End If
+
+        result = result & """" & key & """:" & value & ""
+    Next key
+    result = result & "}"
+
+    ToJson = result
+End Function
+
+
+
 Public Function genEmail(Optional ByVal strTo As String = "", Optional ByVal strBCC As String = "", Optional ByVal strCC As String = "", Optional ByVal strSubject As String = "", Optional body As String = "") As Boolean
 genEmail = False
     
@@ -42,9 +65,9 @@ Set db = CurrentDb()
 Dim rsPermissions As Recordset
 Set rsPermissions = db.OpenRecordset("SELECT * from tblDeveloperInfo WHERE user = '" & userName & "'")
 getEmail = rsPermissions!Email
-rsPermissions.CLOSE
+rsPermissions.Close
 
-db.CLOSE
+db.Close
 
 End Function
 

@@ -35,18 +35,18 @@ Dim rsTheme As Recordset
 If themeId <> 0 Then
     Set rsTheme = db.OpenRecordset("SELECT * FROM tblTheme WHERE recordId = " & themeId)
     
-    If rsTheme!darkMode.Value Then
+    If rsTheme!darkMode.value Then
         TempVars.Add "themeMode", "Dark"
     Else
         TempVars.Add "themeMode", "Light"
     End If
     
-    TempVars.Add "themePrimary", CStr(rsTheme!primaryColor.Value)
-    TempVars.Add "themeSecondary", CStr(rsTheme!secondaryColor.Value)
-    TempVars.Add "themeAccent", CStr(rsTheme!accentColor.Value)
-    TempVars.Add "themeColorLevels", CStr(rsTheme!colorLevels.Value)
+    TempVars.Add "themePrimary", CStr(rsTheme!primaryColor.value)
+    TempVars.Add "themeSecondary", CStr(rsTheme!secondaryColor.value)
+    TempVars.Add "themeAccent", CStr(rsTheme!accentColor.value)
+    TempVars.Add "themeColorLevels", CStr(rsTheme!colorLevels.value)
     
-    rsTheme.CLOSE
+    rsTheme.Close
     Set rsTheme = Nothing
 End If
 
@@ -59,7 +59,7 @@ Form__MAIN.Visible = False
 
 Call setSplashLoading("Loading.....")
 
-DoCmd.CLOSE acForm, "frmSplash"
+DoCmd.Close acForm, "frmSplash"
 DoEvents
 Form__MAIN.Visible = True
 DoCmd.Maximize

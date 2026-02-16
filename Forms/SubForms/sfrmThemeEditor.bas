@@ -42,9 +42,9 @@ Private Sub themeName_Click()
 Dim f As Form, sForm As Control
 Dim i As Integer
 
-TempVars.Add "themePrimary", Me.primaryColor.Value
-TempVars.Add "themeSecondary", Me.secondaryColor.Value
-TempVars.Add "themeAccent", Me.accentColor.Value
+TempVars.Add "themePrimary", Me.primaryColor.value
+TempVars.Add "themeSecondary", Me.secondaryColor.value
+TempVars.Add "themeAccent", Me.accentColor.value
 
 If Me.darkMode Then
     TempVars.Add "themeMode", "Dark"
@@ -52,7 +52,7 @@ Else
     TempVars.Add "themeMode", "Light"
 End If
 
-TempVars.Add "themeColorLevels", Me.colorLevels.Value
+TempVars.Add "themeColorLevels", Me.colorLevels.value
 
 Form_frmThemeEditor.filter = "recordId = " & Me.recordId
 Form_frmThemeEditor.FilterOn = True

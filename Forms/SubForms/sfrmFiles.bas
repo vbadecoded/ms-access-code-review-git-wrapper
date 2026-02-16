@@ -6,11 +6,20 @@ Option Compare Database
 Option Explicit
 
 Private Sub location_Click()
-addNote "git diff " & Me.location
+
+Dim gitCmd As String
+
+If Me.fileStatus = "staged" Then
+    gitCmd = "git diff --cached "
+Else
+    gitCmd = "git diff "
+End If
+
+addNote gitCmd & Me.location
 
 'add all modified files
 Dim results As String
-results = runGitCmd("git diff " & Trim(Me.location))
+results = runGitCmd(gitCmd & Trim(Me.location), printNone:=True)
 
 DoCmd.SetWarnings False
 DoCmd.RunSQL "DELETE * from tblDiff"
@@ -31,7 +40,13 @@ End Sub
 
 Private Sub stage_Click()
 
-Call runGitCmd("git add " & Me.location)
-Call Form__MAIN.gitStatus_Click
+If Me.fileStatus <> "staged" Then
+    Call runGitCmd("git add " & Me.location)
+    Call Form__MAIN.gitStatus_Click
+Else
+    Call runGitCmd("git reset " & Me.location)
+    Call Form__MAIN.gitStatus_Click
+End If
+
 
 End Sub

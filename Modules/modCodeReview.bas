@@ -27,10 +27,10 @@ addNote "establishing variables..."
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-TempVars.Add "releaseNum", Form__MAIN.releaseNum.Value
-TempVars.Add "releaseNotes", Replace(Form__MAIN.releaseNotes.Value, "'", "''")
-TempVars.Add "responsiblePerson", Form__MAIN.responsiblePerson.Value
-TempVars.Add "userEmail", Form__MAIN.userEmail.Value
+TempVars.Add "releaseNum", Form__MAIN.releaseNum.value
+TempVars.Add "releaseNotes", Replace(Form__MAIN.releaseNotes.value, "'", "''")
+TempVars.Add "responsiblePerson", Form__MAIN.responsiblePerson.value
+TempVars.Add "userEmail", Form__MAIN.userEmail.value
 TempVars.Add "databaseName", Form__MAIN.cmdRepo.Column(2)
 
 Dim repoLoc As String
@@ -49,7 +49,7 @@ If Form__MAIN.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
     dbInputRS.Execute "DELETE FROM tblPLM"
     dbInputRS.Execute "Delete * from tblSessionVariables"
     dbInputRS.Execute "Update [tblDBinfo] SET [Release] = '" & TempVars!releaseNum & "' WHERE [ID] = 1"
-    dbInputRS.CLOSE
+    dbInputRS.Close
     Set dbInputRS = Nothing
     
     Set dbInput = CreateObject("Access.Application")
@@ -197,14 +197,14 @@ End If
 MsgBox "Done!"
 
 exitThis: 'clear your objects/detach from the database
-db.CLOSE
+db.Close
 Set db = Nothing
 Set acc = Nothing
 
 shiftKeyBypass = True
 End Function
 
-Function runGitCmd(inputCmd As String, Optional dir As String = "current", Optional printAll As Boolean = True) As String
+Function runGitCmd(inputCmd As String, Optional dir As String = "current", Optional printAll As Boolean = True, Optional printNone As Boolean = False) As String
 
 Dim wsShell As Object
 Dim execObject As Object
@@ -245,6 +245,8 @@ arr = Split(strOutput, vbLf)
 
 Dim ITEM, startChanges As Boolean
 startChanges = False
+
+If printNone Then GoTo noPrint
 
 DoCmd.SetWarnings False
 For Each ITEM In arr
@@ -381,7 +383,7 @@ Set accT = CreateObject("Access.Application")
 Set dbT = accT.DBEngine.OpenDatabase(sStubADPFilename, False, False)
 
 dbT.Properties("AllowByPassKey") = True
-dbT.CLOSE
+dbT.Close
 Set dbT = Nothing
 accT.Quit
 Set accT = Nothing
@@ -398,7 +400,7 @@ Dim delFold
 Dim delFile
 
 'delete all files
-addNote "  --Deleting Forms"
+addNote "  --Clearing Forms Tracking Files---"
 If fso.FolderExists(sExportPath & "\Forms\") Then
     Set delFold = fso.getfolder(sExportPath & "\Forms\")
     For Each delFile In delFold.Files
@@ -406,7 +408,7 @@ If fso.FolderExists(sExportPath & "\Forms\") Then
     Next
 End If
 
-addNote "  --Deleting SubForms"
+addNote "  --Clearing SubForms Tracking Files---"
 If fso.FolderExists(sExportPath & "\Forms\SubForms\") Then
     Set delFold = fso.getfolder(sExportPath & "\Forms\SubForms\")
     For Each delFile In delFold.Files
@@ -414,7 +416,7 @@ If fso.FolderExists(sExportPath & "\Forms\SubForms\") Then
     Next
 End If
 
-addNote "  --Deleting Modules"
+addNote "  --Clearing Modules Tracking Files---"
 If fso.FolderExists(sExportPath & "\Modules\") Then
     Set delFold = fso.getfolder(sExportPath & "\Modules\")
     For Each delFile In delFold.Files
@@ -422,7 +424,7 @@ If fso.FolderExists(sExportPath & "\Modules\") Then
     Next
 End If
 
-addNote "  --Deleting Macros"
+addNote "  --Clearing Macros Tracking Files---"
 If fso.FolderExists(sExportPath & "\Macros\") Then
     Set delFold = fso.getfolder(sExportPath & "\Macros\")
     For Each delFile In delFold.Files
@@ -430,7 +432,7 @@ If fso.FolderExists(sExportPath & "\Macros\") Then
     Next
 End If
 
-addNote "  --Deleting Reports"
+addNote "  --Clearing Reports Tracking Files---"
 If fso.FolderExists(sExportPath & "\Reports\") Then
     Set delFold = fso.getfolder(sExportPath & "\Reports\")
     For Each delFile In delFold.Files
@@ -438,7 +440,7 @@ If fso.FolderExists(sExportPath & "\Reports\") Then
     Next
 End If
 
-addNote "  --Deleting SubReports"
+addNote "  --Clearing SubReports Tracking Files---"
 If fso.FolderExists(sExportPath & "\Reports\SubReports\") Then
     Set delFold = fso.getfolder(sExportPath & "\Reports\SubReports\")
     For Each delFile In delFold.Files
@@ -446,7 +448,7 @@ If fso.FolderExists(sExportPath & "\Reports\SubReports\") Then
     Next
 End If
 
-addNote "  --Deleting Queries"
+addNote "  --Clearing Queries Tracking Files---"
 If fso.FolderExists(sExportPath & "\Queries\") Then
     Set delFold = fso.getfolder(sExportPath & "\Queries\")
     For Each delFile In delFold.Files
@@ -454,9 +456,25 @@ If fso.FolderExists(sExportPath & "\Queries\") Then
     Next
 End If
 
-addNote "  --Deleting SubQueries"
+addNote "  --Clearing SubQueries Tracking Files---"
 If fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then
     Set delFold = fso.getfolder(sExportPath & "\Queries\SubQueries\")
+    For Each delFile In delFold.Files
+        fso.DeleteFile delFile.Path, True ' True for force deletion
+    Next
+End If
+
+addNote "  --Clearing Tables Tracking Files---"
+If fso.FolderExists(sExportPath & "\Tables\") Then
+    Set delFold = fso.getfolder(sExportPath & "\Tables\")
+    For Each delFile In delFold.Files
+        fso.DeleteFile delFile.Path, True ' True for force deletion
+    Next
+End If
+
+addNote "  --Clearing VBProject Tracking Files---"
+If fso.FolderExists(sExportPath & "\VBProject\") Then
+    Set delFold = fso.getfolder(sExportPath & "\VBProject\")
     For Each delFile In delFold.Files
         fso.DeleteFile delFile.Path, True ' True for force deletion
     Next
@@ -468,7 +486,7 @@ Set delFold = Nothing
 '---FORMS---
 For Each myObj In oApplication.CurrentProject.AllForms
     If Not fso.FolderExists(sExportPath & "\Forms\") Then MkDir (sExportPath & "\Forms\")
-    addNote "  " & myObj.FullName
+    addNote "  exporting form: " & myObj.FullName
     'move all new files
     If Left(myObj.FullName, 1) = "s" Then
         If Not fso.FolderExists(sExportPath & "\Forms\SubForms\") Then MkDir (sExportPath & "\Forms\SubForms\")
@@ -483,20 +501,20 @@ Next
 '---MODULES---
 For Each myObj In oApplication.CurrentProject.AllModules
     If Not fso.FolderExists(sExportPath & "\Modules\") Then MkDir (sExportPath & "\Modules\")
-    addNote "  " & myObj.FullName
+    addNote "  exporting module: " & myObj.FullName
     oApplication.SaveAsText acModule, myObj.FullName, sExportPath & "\Modules\" & myObj.FullName & ".bas"
 Next
 
 For Each myObj In oApplication.CurrentProject.AllMacros
     If Not fso.FolderExists(sExportPath & "\Macros\") Then MkDir (sExportPath & "\Macros\")
-    addNote "  " & myObj.FullName
+    addNote "  exporting macro: " & myObj.FullName
     oApplication.SaveAsText acMacro, myObj.FullName, sExportPath & "\Macros\" & myObj.FullName & ".mod"
 Next
 
 '---REPORTS---
 For Each myObj In oApplication.CurrentProject.AllReports
     If Not fso.FolderExists(sExportPath & "\Reports\") Then MkDir (sExportPath & "\Reports\")
-    addNote "  " & myObj.FullName
+    addNote "  exporting report: " & myObj.FullName
     If Left(myObj.FullName, 1) = "s" Then
         If Not fso.FolderExists(sExportPath & "\Reports\SubReports\") Then MkDir (sExportPath & "\Reports\SubReports\")
         oApplication.SaveAsText acReport, myObj.FullName, sExportPath & "\Reports\SubReports\" & myObj.FullName & ".rpt"
@@ -509,15 +527,49 @@ Next
 For Each myObj In oApplication.CurrentDb.QueryDefs
     If Not Left(myObj.Name, 3) = "~sq" Then 'exclude queries defined by the forms. Already included in the form itself
         If Not fso.FolderExists(sExportPath & "\Queries\") Then MkDir (sExportPath & "\Queries\")
-        addNote "  " & myObj.Name
+        addNote "  exporting query: " & myObj.Name
         If Left(myObj.Name, 1) = "s" Then
             If Not fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then MkDir (sExportPath & "\Queries\SubQueries\")
-            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
+            Call writeToTextFile(sExportPath & "\Queries\SubQueries\" & myObj.Name & ".sql", myObj.SQL)
+            'oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
         Else
-            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
+            Call writeToTextFile(sExportPath & "\Queries\" & myObj.Name & ".sql", myObj.SQL)
+            'oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
         End If
     End If
 Next
+
+'---TABLES---
+For Each myObj In oApplication.CurrentDb.TableDefs
+    If Not fso.FolderExists(sExportPath & "\Tables\") Then MkDir (sExportPath & "\Tables\")
+
+    If myObj.Connect = "" Then 'for local tables only, include data
+        addNote "  exporting table definition: " & myObj.Name
+        oApplication.ExportXML acTable, myObj.Name, sExportPath & "\Tables\" & myObj.Name & "_rows.xml", sExportPath & "\Tables\" & myObj.Name & "_def.xml", , , , acExportAllTableAndFieldProperties
+    End If
+Next
+
+'---VB PROJECT INFORMATION---
+Dim body As String, dictSubValues As Object, dictBody As Object
+Set dictSubValues = CreateObject("Scripting.Dictionary")
+Set dictBody = CreateObject("Scripting.Dictionary")
+
+addNote "  exporting vbproject information"
+
+For Each myObj In oApplication.VBE.ActiveVBProject.References
+    If Not fso.FolderExists(sExportPath & "\VBproject\") Then MkDir (sExportPath & "\VBproject\")
+    addNote "  " & myObj.Name & myObj.major & "." & myObj.minor
+    dictSubValues.Add myObj.Name & " " & myObj.major & "." & myObj.minor, myObj.FullPath
+Next
+
+dictBody.Add "project-name", oApplication.VBE.ActiveVBProject.Name
+dictBody.Add "vb-references", dictSubValues
+
+Call writeToTextFile(sExportPath & "\VBproject\VBproject-properties.json", ToJson(dictBody))
+
+'---DB FILE PROPERTIES---
+Dim dbtestthis
+Set dbtestthis = oApplication.CurrentDb
 
 Set myObj = Nothing
 oApplication.CloseCurrentDatabase
@@ -525,7 +577,18 @@ oApplication.Quit
 Set oApplication = Nothing
 Set fso = Nothing
 
-MsgBox "Files Decomposed from " & sADPFilename, vbInformation, "Nicely Done"
+addNote "++ Files Decomposed from " & sADPFilename
+
+End Function
+
+Function writeToTextFile(fileLocation As String, textToWrite As String)
+
+Dim FileNum As Integer
+
+Open fileLocation For Output As #1 ' Open the file for output
+Print #1, textToWrite
+
+Close #1
 
 End Function
 

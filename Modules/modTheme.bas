@@ -155,18 +155,18 @@ For Each ctl In setForm.Controls 'simply loop through all controls on the form
                 fadeBack = shadeColor(backCol, scalarBack)
             End If
             
+            If ctl.Tag Like "*accentBtn*" Then
+                fadeBack = shadeColor(backAccent, (0.2 * Level) + scalarBack)
+                ctl.BackColor = shadeColor(backAccent, scalarBack)
+                ctl.Gradient = 17
+            End If
+            
             ctl.HoverColor = fadeBack
             ctl.PressedColor = fadeBack
             
             If ctl.Tag Like "*cardBtn*" Then
                 ctl.HoverColor = backCol
                 ctl.PressedColor = backCol
-            End If
-            
-            If ctl.Tag Like "*accentBtn*" Then
-                fadeBack = shadeColor(backAccent, scalarBack)
-                ctl.BackColor = backAccent
-                ctl.Gradient = 17
             End If
         '---
         '---LABEL

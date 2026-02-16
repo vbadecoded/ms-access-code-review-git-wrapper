@@ -8,9 +8,9 @@ Option Explicit
 Function applyThemeChanges()
 
 'All the theme information is in TEMPVARS so it resets when you close it and it will persist an entire database session. This could be a local session variables table as well
-TempVars.Add "themePrimary", Me.primaryColor.Value
-TempVars.Add "themeSecondary", Me.secondaryColor.Value
-TempVars.Add "themeAccent", Me.accentColor.Value
+TempVars.Add "themePrimary", Me.primaryColor.value
+TempVars.Add "themeSecondary", Me.secondaryColor.value
+TempVars.Add "themeAccent", Me.accentColor.value
 
 If Me.darkMode Then
     TempVars.Add "themeMode", "Dark"
@@ -18,7 +18,7 @@ Else
     TempVars.Add "themeMode", "Light"
 End If
 
-TempVars.Add "themeColorLevels", Me.colorLevels.Value
+TempVars.Add "themeColorLevels", Me.colorLevels.value
 
 'trying to prevent flashing...
 DoCmd.Hourglass True
