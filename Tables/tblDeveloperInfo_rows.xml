@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dataroot xmlns:od="urn:schemas-microsoft-com:officedata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  xsi:noNamespaceSchemaLocation="tblDeveloperInfo_def.xml" generated="2026-02-16T11:52:43">
+<tblDeveloperInfo>
+<recordId>1</recordId>
+<user>brownj</user>
+<email>brownj@us.nifco.com</email>
+</tblDeveloperInfo>
+<tblDeveloperInfo>
+<recordId>2</recordId>
+<user>georgemi</user>
+<email>georgemi@us.nifco.com</email>
+</tblDeveloperInfo>
+<tblDeveloperInfo>
+<recordId>3</recordId>
+<user>aurandj</user>
+<email>aurandj@us.nifco.com</email>
+</tblDeveloperInfo>
+<tblDeveloperInfo>
+<recordId>4</recordId>
+<user>hauptmanw</user>
+<email>hauptmanw@us.nifco.com</email>
+</tblDeveloperInfo>
+</dataroot>
