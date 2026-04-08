@@ -70,10 +70,8 @@ If Form__MAIN.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
     
     addNote "Backup backends"
     Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ChangePointE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ChangePointE.accdb")
     Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_DesignE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_DesignE.accdb")
     Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ProjectE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ProjectE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_Sales.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_Sales.accdb")
 End If
 
 addNote "Enable Shift Bypass"
@@ -91,7 +89,7 @@ MsgBox "Once the database is closed, then click OK", vbInformation, "Up Next"
 addNote "Compacting dev into temp file"
 
 TempVars.Add "devTemp", repoLoc & "temp.accdb"
-Application.compactRepair TempVars!devFile, TempVars!devTemp
+Application.CompactRepair TempVars!devFile, TempVars!devTemp
 fso.DeleteFile (TempVars!devFile)
 
 '---Compile Temp File---
@@ -123,7 +121,7 @@ DoEvents
 
 '---Compact Temp into Dev---
 addNote "Compacting temp file back into FE"
-Application.compactRepair TempVars!devTemp, TempVars!devFile
+Application.CompactRepair TempVars!devTemp, TempVars!devFile
 fso.DeleteFile (TempVars!devTemp)
 
 addNote Form__MAIN.cmdRepo.Column(2) & " CLEANED"
@@ -179,11 +177,11 @@ Const conPropNotFound = 3270
 Set acc = CreateObject("Access.Application")
 
 'open the "database" now within that object
-Set db = acc.DBEngine.OpenDatabase(location, False, False)
+Set db = acc.dbEngine.OpenDatabase(location, False, False)
 
 'run the command
 db.Properties("AllowByPassKey") = toggle
-
+shiftKeyBypass = True
 GoTo exitThis
 
 errEnableShift:
@@ -191,13 +189,15 @@ If Err = conPropNotFound Then
     Set prop = db.CreateProperty("AllowByPassKey", dbBoolean, toggle)
     db.Properties.Append prop
     Resume Next
+    shiftKeyBypass = True
     GoTo exitThis
 End If
 
-MsgBox "Done!"
+shiftKeyBypass = False
+MsgBox "error! Maybe you alread have it open? Please close if so."
 
 exitThis: 'clear your objects/detach from the database
-db.Close
+If Not (db Is Nothing) Then db.Close
 Set db = Nothing
 Set acc = Nothing
 
@@ -212,6 +212,8 @@ Dim sOutput As String
 Dim sWorkingDirectory As String
 
 ' Set the working directory to your Git repository
+runGitCmd = ""
+If IsNull(Form__MAIN.cmdRepo) Then Exit Function
 If dir = "current" Then
     sWorkingDirectory = Form__MAIN.cmdRepo
 Else
@@ -234,7 +236,7 @@ End With
 On Error Resume Next
 Dim strOutput
 With CreateObject("Scripting.FileSystemObject")
-    strOutput = .OpenTextFile(Environ("temp") & "\tempgitoutput.txt").ReadAll()
+    strOutput = .openTextFile(Environ("temp") & "\tempgitoutput.txt").ReadAll()
     .DeleteFile Environ("temp") & "\tempgitoutput.txt"
 End With
 On Error GoTo 0
@@ -302,6 +304,8 @@ End Function
 
 Function recomposeAccdb(importTo As String)
 
+imortTo = "H:\dev\workingdb\WorkingDB_FE - Copy.accdb"
+
 '---RECOMPOSE---
 Dim myComponent
 Dim sModuleType
@@ -312,9 +316,9 @@ Dim myPath, repo
 Dim fso As Object
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-importTo = Form__MAIN.cmdRepo & "temp.accdb"
-fso.CopyFile Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2), importTo
-repo = "\\data\mdbdata\WorkingDB\build\Send\"
+'importTo = Form__MAIN.cmdRepo & "temp.accdb"
+'fso.CopyFile Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2), importTo
+repo = "H:\dev\workingdb\"
 myPath = fso.getparentfoldername(importTo)
 
 addNote "starting Access..."
@@ -326,31 +330,113 @@ oApplication.runCommand acCmdCloseAll
 oApplication.CurrentDb.Properties("AllowByPassKey") = True
 
 Dim folder
-Set folder = fso.getfolder(repo)
-
 Dim myFile, objectname, objecttype
+
+'forms
+Set folder = fso.getfolder(repo & "\Forms\")
+
 For Each myFile In folder.Files
     objecttype = fso.GetExtensionName(myFile.Name)
     objectname = fso.GetBaseName(myFile.Name)
     addNote "Loading " & objectname & " (" & objecttype & ")"
 
-    Select Case objecttype
-        Case "form"
+    If objecttype = "form" Then
         oApplication.LoadFromText acForm, objectname, myFile.Path
         addNote objectname & " LOADED"
-        Case "bas"
-        oApplication.LoadFromText acModule, objectname, myFile.Path
+    End If
+Next
+
+'subforms
+Set folder = fso.getfolder(repo & "\Forms\SubForms\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    If objecttype = "form" Then
+        oApplication.LoadFromText acForm, objectname, myFile.Path
         addNote objectname & " LOADED"
-        Case "mod"
-        oApplication.LoadFromText acMacro, objectname, myFile.Path
-        addNote objectname & " LOADED"
-        Case "rpt"
-        oApplication.LoadFromText acReport, objectname, myFile.Path
-        addNote objectname & " LOADED"
-        Case "qry"
+    End If
+Next
+
+'macros
+Set folder = fso.getfolder(repo & "\Macros\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    oApplication.LoadFromText acMacro, objectname, myFile.Path
+    addNote objectname & " LOADED"
+Next
+
+'modules
+Set folder = fso.getfolder(repo & "\Modules\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    oApplication.LoadFromText acModule, objectname, myFile.Path
+    addNote objectname & " LOADED"
+Next
+
+'queries
+Set folder = fso.getfolder(repo & "\Queries\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+    
+'    On Error Resume Next
+'    oApplication.CurrentDb.QueryDefs.Delete objectname
+'    On Error GoTo 0
+'
+'    oApplication.CurrentDb.CreateQueryDef objectname, fso.openTextFile(myFile.Path, 1).ReadAll
+    If objecttype = "qry" Then
         oApplication.LoadFromText acQuery, objectname, myFile.Path
         addNote objectname & " LOADED"
-    End Select
+    End If
+Next
+
+'subqueries
+Set folder = fso.getfolder(repo & "\Queries\SubQueries\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+    
+    oApplication.LoadFromText acQuery, objectname, myFile.Path
+    addNote objectname & " LOADED"
+Next
+
+'reports
+Set folder = fso.getfolder(repo & "\Reports\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    oApplication.LoadFromText acReport, objectname, myFile.Path
+    addNote objectname & " LOADED"
+Next
+
+'subreports
+Set folder = fso.getfolder(repo & "\Reports\SubReports\")
+
+For Each myFile In folder.Files
+    objecttype = fso.GetExtensionName(myFile.Name)
+    objectname = fso.GetBaseName(myFile.Name)
+    addNote "Loading " & objectname & " (" & objecttype & ")"
+
+    oApplication.LoadFromText acReport, objectname, myFile.Path
+    addNote objectname & " LOADED"
 Next
 
 oApplication.runCommand acCmdCompileAndSaveAllModules
@@ -380,7 +466,7 @@ addNote "starting Access..."
 
 Dim dbT, accT
 Set accT = CreateObject("Access.Application")
-Set dbT = accT.DBEngine.OpenDatabase(sStubADPFilename, False, False)
+Set dbT = accT.dbEngine.OpenDatabase(sStubADPFilename, False, False)
 
 dbT.Properties("AllowByPassKey") = True
 dbT.Close
@@ -531,23 +617,23 @@ For Each myObj In oApplication.CurrentDb.QueryDefs
         If Left(myObj.Name, 1) = "s" Then
             If Not fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then MkDir (sExportPath & "\Queries\SubQueries\")
             Call writeToTextFile(sExportPath & "\Queries\SubQueries\" & myObj.Name & ".sql", myObj.SQL)
-            'oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
+            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
         Else
             Call writeToTextFile(sExportPath & "\Queries\" & myObj.Name & ".sql", myObj.SQL)
-            'oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
+            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
         End If
     End If
 Next
 
 '---TABLES---
-For Each myObj In oApplication.CurrentDb.TableDefs
-    If Not fso.FolderExists(sExportPath & "\Tables\") Then MkDir (sExportPath & "\Tables\")
-
-    If myObj.Connect = "" Then 'for local tables only, include data
-        addNote "  exporting table definition: " & myObj.Name
-        oApplication.ExportXML acTable, myObj.Name, sExportPath & "\Tables\" & myObj.Name & "_rows.xml", sExportPath & "\Tables\" & myObj.Name & "_def.xml", , , , acExportAllTableAndFieldProperties
-    End If
-Next
+'For Each myObj In oApplication.CurrentDb.TableDefs
+'    If Not fso.FolderExists(sExportPath & "\Tables\") Then MkDir (sExportPath & "\Tables\")
+'
+'    If myObj.Connect = "" Then 'for local tables only, include data
+'        addNote "  exporting table definition: " & myObj.Name
+'        oApplication.ExportXML acTable, myObj.Name, sExportPath & "\Tables\" & myObj.Name & "_rows.xml", sExportPath & "\Tables\" & myObj.Name & "_def.xml", , , , acExportAllTableAndFieldProperties
+'    End If
+'Next
 
 '---VB PROJECT INFORMATION---
 Dim body As String, dictSubValues As Object, dictBody As Object
