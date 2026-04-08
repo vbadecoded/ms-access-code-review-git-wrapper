@@ -1,543 +1,563 @@
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = True
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = False
-Option Compare Database
-Option Explicit
+attribute vb_globalnamespace = false
+attribute vb_creatable = true
+attribute vb_predeclaredid = true
+attribute vb_exposed = false
+option compare database
+option explicit
 
-Dim fso As Object
+dim fso as object
 
-Private Sub cleanAndDecompose_Click()
-formStatus (True)
+private sub cleananddecompose_click()
+formstatus (true)
 
-If Not cleanDatabase Then Exit Sub
-DoEvents
-MsgBox "Hold shift as you click OK", vbInformation, "Go on"
-Call decomposeAccdb(Form__MAIN.cmdRepo & Me.cmdRepo.Column(2), Form__MAIN.cmdRepo)
+if not cleandatabase then exit sub
+doevents
 
-formStatus (False)
-End Sub
+' decompose handles shift bypass internally   no need for user to hold shift
+call decomposeaccdb(form__main.cmdrepo & me.cmdrepo.column(2), form__main.cmdrepo)
 
-Private Sub clearLog_Click()
-formStatus (True)
+formstatus (false)
+end sub
 
-Dim db As Database
-Set db = CurrentDb()
+private sub clearlog_click()
+formstatus (true)
 
-db.Execute "DELETE * from tblReleaseTracking"
+dim db as database
+set db = currentdb()
 
-Me.sfrmTracking.Requery
+db.execute "DELETE * from tblReleaseTracking"
 
-Set db = Nothing
+me.sfrmtracking.requery
 
-formStatus (False)
-End Sub
+set db = nothing
 
-Private Sub cmdRepo_AfterUpdate()
-formStatus (True)
+formstatus (false)
+end sub
 
-Call getRepoInfo(Me.cmdRepo)
-Call gitStatus_Click
+private sub cmdrepo_afterupdate()
+formstatus (true)
 
-formStatus (False)
-End Sub
+call getrepoinfo(me.cmdrepo)
+call gitstatus_click
 
-Private Sub createAccde_Click()
-formStatus (True)
+formstatus (false)
+end sub
 
-Dim filePath As String
-Dim oldName As String, newName As String
+private sub createaccde_click()
+formstatus (true)
 
-filePath = Form__MAIN.cmdRepo
-oldName = Me.cmdRepo.Column(2)
-newName = Left(oldName, Len(oldName) - 1) & "e"
+dim filepath as string
+dim oldname as string, newname as string
 
-Dim oAccess As Object
+filepath = form__main.cmdrepo
+oldname = me.cmdrepo.column(2)
+newname = left(oldname, len(oldname) - 1) & "e"
 
-Set oAccess = CreateObject("Access.Application")
-oAccess.AutomationSecurity = 1
-oAccess.SysCmd 603, filePath & oldName, filePath & newName
-Set oAccess = Nothing
+dim oaccess as object
 
-addNote "Compiled Version Created: " & filePath & newName
+set oaccess = createobject("Access.Application")
+oaccess.automationsecurity = 1
+oaccess.syscmd 603, filepath & oldname, filepath & newname
+set oaccess = nothing
 
-formStatus (False)
-End Sub
+addnote "Compiled Version Created: " & filepath & newname
 
-Private Sub decompose_Click()
-formStatus (True)
+formstatus (false)
+end sub
 
-Call decomposeAccdb(Form__MAIN.cmdRepo & Me.cmdRepo.Column(2), Form__MAIN.cmdRepo)
+private sub decompose_click()
+formstatus (true)
 
-formStatus (False)
-End Sub
+call decomposeaccdb(form__main.cmdrepo & me.cmdrepo.column(2), form__main.cmdrepo)
 
-Private Sub disableShift_Click()
-formStatus (True)
+formstatus (false)
+end sub
 
-If shiftKeyBypass(getDB, False) Then addNote Me.cmdRepo.Column(2) & " Shift Key Disabled"
+private sub disableshift_click()
+formstatus (true)
 
-formStatus (False)
-End Sub
+if shiftkeybypass(getdb, false) then addnote me.cmdrepo.column(2) & " Shift Key Disabled"
 
-Private Sub enableShift_Click()
-formStatus (True)
+formstatus (false)
+end sub
 
-If shiftKeyBypass(getDB, True) Then addNote Me.cmdRepo.Column(2) & " Shift Key Enabled"
+private sub enableshift_click()
+formstatus (true)
 
-formStatus (False)
-End Sub
+if shiftkeybypass(getdb, true) then addnote me.cmdrepo.column(2) & " Shift Key Enabled"
 
-Private Sub Form_Load()
-formStatus (True)
+formstatus (false)
+end sub
+
+private sub form_load()
+formstatus (true)
 
 'initial data based on environment variables
-Me.responsiblePerson = Environ("username")
-Me.userEmail = getEmail(Environ("username"))
+me.responsibleperson = environ("username")
+me.useremail = getemail(environ("username"))
 
 '----------------------------
-'---REPOSITORY SEARCHING
+'---repository searching
 '----------------------------
 
-Set fso = CreateObject("Scripting.FileSystemObject")
+set fso = createobject("Scripting.FileSystemObject")
 
-Dim db As Database
-Set db = CurrentDb()
+dim db as database
+set db = currentdb()
 
-Dim rsRepos As Recordset, rsFindRepo As Recordset
-Set rsRepos = db.OpenRecordset("tblRepoLocation")
+dim rsrepos as recordset, rsfindrepo as recordset
+set rsrepos = db.openrecordset("tblRepoLocation")
 
-'first delete all records in rsRepo
-Do While Not rsRepos.EOF
-    rsRepos.Delete
-    rsRepos.MoveNext
-Loop
-rsRepos.MoveFirst
+'first delete all records in rsrepo
+do while not rsrepos.eof
+    rsrepos.delete
+    rsrepos.movenext
+loop
+rsrepos.movefirst
 
-'use FSO to scan folders near this repository - these are treated as repositories to work on IF an .accdb or .mdb file is found
-Dim f, sf, sfo
-Set f = fso.getfolder(fso.getparentfoldername(CurrentProject.Path))
-Set sf = f.subfolders
+'use fso to scan folders near this repository - these are treated as repositories to work on if an .accdb or .mdb file is found
+dim f, sf, sfo
+set f = fso.getfolder(fso.getparentfoldername(currentproject.path))
+set sf = f.subfolders
 
-Dim fsDB, fsDBName As String, fsProdLocName As String
-For Each sfo In sf
+dim fsdb, fsdbname as string, fsprodlocname as string
+for each sfo in sf
     'look for the record first - skip if found
-    If rsRepos.RecordCount > 0 Then
-        Set rsFindRepo = db.OpenRecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & sfo.Path & "\" & "'")
-        If rsFindRepo.RecordCount > 0 Then GoTo skipRepo
-    End If
+    if rsrepos.recordcount > 0 then
+        set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & sfo.path & "\" & "'")
+        if rsfindrepo.recordcount > 0 then goto skiprepo
+    end if
     
     'now scan for the .accdb/.mdb and skip if not found
-    fsDBName = ""
-    fsProdLocName = ""
-    For Each fsDB In sfo.Files
-        Select Case fso.GetExtensionName(fsDB.Path)
-            Case "accdb", "mdb"
+    fsdbname = ""
+    fsprodlocname = ""
+    for each fsdb in sfo.files
+        select case fso.getextensionname(fsdb.path)
+            case "accdb", "mdb"
                 'database found!
-                fsDBName = fsDB.Name
-            Case "txt"
-                If fsDB.Name = ".productionLocation.txt" Then
-                    'Get first line of text document
-                    Open fsDB.Path For Input As #1
-                    Line Input #1, fsProdLocName
-                    Close #1
-                End If
-        End Select
-    Next fsDB
+                fsdbname = fsdb.name
+            case "txt"
+                if fsdb.name = ".productionLocation.txt" then
+                    'get first line of text document
+                    open fsdb.path for input as #1
+                    line input #1, fsprodlocname
+                    close #1
+                end if
+        end select
+    next fsdb
     
-    If fsDBName = "" Then GoTo skipRepo 'no database found
+    if fsdbname = "" then goto skiprepo 'no database found
     
-    rsRepos.addNew
-    rsRepos!repoLocation = sfo.Path & "\"
-    rsRepos!dbName = fsDBName
-    rsRepos!productionLocation = fsProdLocName
-    rsRepos.Update
+    rsrepos.addnew
+    rsrepos!repolocation = sfo.path & "\"
+    rsrepos!dbname = fsdbname
+    rsrepos!productionlocation = fsprodlocname
+    rsrepos.update
     
-skipRepo:
-Next
+skiprepo:
+next
 
 '----------------------------
-'---REPOSITORY SELECTION
+'---repository selection
 '----------------------------
 
-'---AUTO SELECT REPO IF ONLY ONE---
-If rsRepos.RecordCount = 1 Then
-    Me.cmdRepo = rsRepos!repoLocation & "\"
-    Call getRepoInfo(rsRepos!repoLocation & "\")
-Else
-'---IF MORE THAN ONE REPO FOUND, CHECK tblLastUsed---
-    'if more than one is found, check if the previously used repo is available in the LastUsed table
-    Dim rsLU As Recordset
-    Set rsLU = db.OpenRecordset("SELECT * from tblLastUsed WHERE recordId = 1")
-    If Nz(rsLU!repoLocation, "") = "" Then GoTo LUnotFound 'blank field
-    Set rsFindRepo = db.OpenRecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & rsLU!repoLocation & "'")
-    If rsFindRepo.RecordCount = 1 Then 'last used repo found!!
-        Me.cmdRepo = rsLU!repoLocation
-        Call getRepoInfo(rsLU!repoLocation)
-    End If
+'---auto select repo if only one---
+if not rsrepos.eof then
+    me.cmdrepo = rsrepos!repolocation & "\"
+    call getrepoinfo(rsrepos!repolocation & "\")
+else
+'---if more than one repo found, check tbllastused---
+    'if more than one is found, check if the previously used repo is available in the lastused table
+    dim rslu as recordset
+    set rslu = db.openrecordset("SELECT * from tblLastUsed WHERE recordId = 1")
+    if nz(rslu!repolocation, "") = "" then goto lunotfound 'blank field
+    set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & rslu!repolocation & "'")
+    if rsfindrepo.recordcount = 1 then 'last used repo found!!
+        me.cmdrepo = rslu!repolocation
+        call getrepoinfo(rslu!repolocation)
+    end if
     
-LUnotFound:
-End If
+lunotfound:
+end if
 
-'---Cleanup---
-On Error Resume Next
-rsLU.Close: Set rsLU = Nothing
-rsFindRepo.Close: Set rsFindRepo = Nothing
-rsRepos.Close: Set rsRepos = Nothing
-Set db = Nothing
+'---cleanup---
+on error resume next
+rslu.close: set rslu = nothing
+rsfindrepo.close: set rsfindrepo = nothing
+rsrepos.close: set rsrepos = nothing
+set db = nothing
 
-Set fso = Nothing
+set fso = nothing
 
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * FROM tblReleaseTracking"
-DoCmd.RunSQL "DELETE * from tblFiles"
-DoCmd.RunSQL "DELETE * from tblDiff"
-DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) values('Form Initialized')"
-DoCmd.SetWarnings True
-Me.sfrmTracking.Requery
+dim dbinit as database
+set dbinit = currentdb()
+dbinit.execute "DELETE * FROM tblReleaseTracking", dbfailonerror
+dbinit.execute "DELETE * FROM tblFiles", dbfailonerror
+dbinit.execute "DELETE * FROM tblDiff", dbfailonerror
+dbinit.execute "INSERT INTO tblReleaseTracking(task) VALUES('Form Initialized')", dbfailonerror
+set dbinit = nothing
+me.sfrmtracking.requery
 
-Call Me.gitStatus_Click
+call me.gitstatus_click
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub gitbranch_AfterUpdate()
-formStatus (True)
+private sub gitbranch_afterupdate()
+formstatus (true)
 
-addNote "git checkout " & Me.gitbranch
+addnote "git checkout " & me.gitbranch
 
-Call runGitCmd("git checkout " & Me.gitbranch)
-Call gitStatus_Click
+call rungitcmd("git checkout " & me.gitbranch)
+call gitstatus_click
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub gitCommit_Click()
-formStatus (True)
+private sub gitcommit_click()
+formstatus (true)
 
-addNote "git commit -m """ & Me.releaseNotes & """"
-Call runGitCmd("git commit -m """ & Me.releaseNotes & """")
-Call Me.gitStatus_Click
+addnote "git commit -m """ & me.releasenotes & """"
+call rungitcmd("git commit -m """ & me.releasenotes & """")
+call me.gitstatus_click
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub gitMerge_Click()
-formStatus (True)
+private sub gitmerge_click()
+formstatus (true)
 
-addNote "git merge " & Me.gitBranchSelect
-Call runGitCmd("git merge " & Me.gitBranchSelect)
+addnote "git merge " & me.gitbranchselect
+call rungitcmd("git merge " & me.gitbranchselect)
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub gitPull_Click()
-formStatus (True)
+private sub gitpull_click()
+formstatus (true)
 
-addNote "git pull origin " & Me.gitbranch
-Call runGitCmd("git pull origin " & Me.gitbranch)
+addnote "git pull origin " & me.gitbranch
+call rungitcmd("git pull origin " & me.gitbranch)
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub gitPush_Click()
-formStatus (True)
+private sub gitpush_click()
+formstatus (true)
 
-addNote "git push origin " & Me.gitbranch
-Call runGitCmd("git push origin " & Me.gitbranch)
+addnote "git push origin " & me.gitbranch
+call rungitcmd("git push origin " & me.gitbranch)
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Public Sub gitStatus_Click()
-formStatus (True)
+public sub gitstatus_click()
+formstatus (true)
 
-addNote "git status"
+addnote "git status"
 
 'add all modified files
-Dim results As String
-results = runGitCmd("git status", printAll:=False)
+dim results as string
+results = rungitcmd("git status", printall:=false)
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * from tblFiles"
-DoCmd.RunSQL "DELETE * from tblDiff"
-DoCmd.SetWarnings True
+dim dbstatus as database
+set dbstatus = currentdb()
+dbstatus.execute "DELETE * FROM tblFiles", dbfailonerror
+dbstatus.execute "DELETE * FROM tblDiff", dbfailonerror
 
-Dim fso As Object
-Set fso = CreateObject("Scripting.FileSystemObject")
+dim fso as object
+set fso = createobject("Scripting.FileSystemObject")
 
-Dim arr() As String
-arr = Split(results, vbLf)
-DoCmd.SetWarnings False
-Dim ITEM, itemStatus As String
-For Each ITEM In arr
-    If InStr(ITEM, "Changes to be committed") Then itemStatus = "staged"
-    If InStr(ITEM, "Changes not staged for commit") Then itemStatus = "unstaged"
-    If InStr(ITEM, "Untracked files") Then itemStatus = "new"
-    If InStr(ITEM, "modified:") Then
-        DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & "','" & itemStatus & "')"
-    ElseIf itemStatus = "new" Then
-        If fso.FileExists(Me.cmdRepo & Replace(ITEM, Chr(9), "")) Then 'NEW file
-            DoCmd.RunSQL "INSERT INTO tblFiles(location,fileStatus) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & "','" & itemStatus & "')"
-        End If
-    End If
-Next ITEM
-DoCmd.SetWarnings True
+dim arr() as string
+arr = split(results, vblf)
 
-Set fso = Nothing
+dim item, itemstatus as string
+dim rsfiles as dao.recordset
+set rsfiles = dbstatus.openrecordset("tblFiles", dbopendynaset, dbappendonly)
 
-Me.sfrmFiles.Requery
-Me.sfrmDiff.Requery
+for each item in arr
+    if instr(item, "Changes to be committed") then itemstatus = "staged"
+    if instr(item, "Changes not staged for commit") then itemstatus = "unstaged"
+    if instr(item, "Untracked files") then itemstatus = "new"
+    if instr(item, "modified:") then
+        rsfiles.addnew
+        rsfiles!location = trim(replace(item, "modified:", ""))
+        rsfiles!filestatus = itemstatus
+        rsfiles.update
+    elseif itemstatus = "new" then
+        if fso.fileexists(me.cmdrepo & replace(item, chr(9), "")) then
+            rsfiles.addnew
+            rsfiles!location = trim(replace(item, "modified:", ""))
+            rsfiles!filestatus = itemstatus
+            rsfiles.update
+        end if
+    end if
+next item
 
-formStatus (False)
-End Sub
+rsfiles.close
+set rsfiles = nothing
+set dbstatus = nothing
 
-Private Sub increaseRev_Click()
-formStatus (True)
+set fso = nothing
 
-Dim X, Y, major, minor, min, newMajor, newMinor, newMin
+me.sfrmfiles.requery
+me.sfrmdiff.requery
 
-X = Me.releaseNum
-Y = Replace(X, "REV", "")
-major = Split(Y, ".")(0)
-minor = Split(Y, ".")(1)
-min = Split(Y, ".")(2)
+formstatus (false)
+end sub
 
-If (min <> 99) Then
-    newMajor = major
-    newMinor = minor
-    newMin = min + 1
-    If newMin < 10 Then newMin = "0" & newMin
-    GoTo done
-End If
-newMin = "00"
+private sub increaserev_click()
+formstatus (true)
 
-If (minor <> 9) Then
-    newMajor = major
-    newMinor = minor + 1
-    GoTo done
-End If
-newMinor = 0
-newMajor = major + 1
+dim x, y, major, minor, min, newmajor, newminor, newmin
+
+x = me.releasenum
+y = replace(x, "REV", "")
+major = split(y, ".")(0)
+minor = split(y, ".")(1)
+min = split(y, ".")(2)
+
+if (min <> 99) then
+    newmajor = major
+    newminor = minor
+    newmin = min + 1
+    if newmin < 10 then newmin = "0" & newmin
+    goto done
+end if
+newmin = "00"
+
+if (minor <> 9) then
+    newmajor = major
+    newminor = minor + 1
+    goto done
+end if
+newminor = 0
+newmajor = major + 1
 
 done:
-Dim newRel As String
-newRel = "REV" & newMajor & "." & newMinor & "." & newMin
-Me.releaseNum = newRel
-addNote "Rev Increased to " & newRel
+dim newrel as string
+newrel = "REV" & newmajor & "." & newminor & "." & newmin
+me.releasenum = newrel
+addnote "Rev Increased to " & newrel
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Function formStatus(inWork As Boolean)
+function formstatus(inwork as boolean)
 
-If inWork Then
-    Me.Detail.BackColor = rgb(50, 0, 0)
-Else
-    Call setTheme(Me)
-End If
+if inwork then
+    me.detail.backcolor = rgb(50, 0, 0)
+else
+    call settheme(me)
+end if
 
-Me.codeRunning.Visible = inWork
+me.coderunning.visible = inwork
 
-End Function
+end function
 
-Private Sub notifyDepartment_AfterUpdate()
-formStatus (True)
+private sub notifydepartment_afterupdate()
+formstatus (true)
 
-Dim db As Database
-Dim rs As Recordset
+dim db as database
+dim rs as recordset
 
-Set db = OpenDatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , True)
-Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE inactive = false AND dept = '" & Me.notifyDepartment & "'")
+set db = opendatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , true)
+set rs = db.openrecordset("SELECT * FROM tblPermissions WHERE inactive = false AND dept = '" & me.notifydepartment & "'")
 
-Dim emails As String
+dim emails as string
 emails = ""
 
-Do While Not rs.EOF
-    emails = emails & rs!userEmail & "; "
-    rs.MoveNext
-Loop
+do while not rs.eof
+    emails = emails & rs!useremail & "; "
+    rs.movenext
+loop
 
-Call genEmail(strBCC:=emails, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
+call genemail(strbcc:=emails, strsubject:="WorkingDB Update Released", body:=me.releasenotes)
 
-rs.Close
-Set rs = Nothing
-Set db = Nothing
+rs.close
+set rs = nothing
+set db = nothing
 
-addNote Me.notifyDepartment & " email generated"
+addnote me.notifydepartment & " email generated"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub notifyUser_AfterUpdate()
-formStatus (True)
+private sub notifyuser_afterupdate()
+formstatus (true)
 
-Dim db As Database
-Dim rs As Recordset
+dim db as database
+dim rs as recordset
 
-Set db = OpenDatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , True)
-Set rs = db.OpenRecordset("SELECT * FROM tblPermissions WHERE user = '" & Me.notifyUser & "'")
+set db = opendatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , true)
+set rs = db.openrecordset("SELECT * FROM tblPermissions WHERE user = '" & me.notifyuser & "'")
 
-Call genEmail(strTo:=rs!userEmail, strSubject:="WorkingDB Update Released", body:=Me.releaseNotes)
+call genemail(strto:=rs!useremail, strsubject:="WorkingDB Update Released", body:=me.releasenotes)
 
-rs.Close
-Set rs = Nothing
-Set db = Nothing
+rs.close
+set rs = nothing
+set db = nothing
 
-addNote Me.notifyUser & " email generated"
+addnote me.notifyuser & " email generated"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub openAccdb_Click()
-formStatus (True)
+private sub openaccdb_click()
+formstatus (true)
 
-Call openPath(getDB)
-addNote Me.cmdRepo.Column(2) & " Opened"
+call openpath(getdb)
+addnote me.cmdrepo.column(2) & " Opened"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub openGitGUI_Click()
-formStatus (True)
+private sub opengitgui_click()
+formstatus (true)
 
-addNote "git gui"
-Call runGitCmd("git gui")
+addnote "git gui"
+call rungitcmd("git gui")
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub openThemeEditor_Click()
-formStatus (True)
+private sub openthemeeditor_click()
+formstatus (true)
 
-addNote "open theme editor"
+addnote "open theme editor"
 
-DoCmd.OpenForm "frmThemeEditor"
+docmd.openform "frmThemeEditor"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub publishChanges_Click()
-formStatus (True)
+private sub publishchanges_click()
+formstatus (true)
 
-addNote "git pull origin master : " & Me.cmdRepo.Column(1)
-Call runGitCmd("git pull origin master", Me.cmdRepo.Column(1))
+addnote "git pull origin master : " & me.cmdrepo.column(1)
+call rungitcmd("git pull origin master", me.cmdrepo.column(1))
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub publishFE_Click()
-formStatus (True)
+private sub publishfe_click()
+formstatus (true)
 
-Call cleanDatabase
+call cleandatabase
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub publishNOTES_Click()
-formStatus (True)
+private sub publishnotes_click()
+formstatus (true)
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "INSERT INTO " & Me.revisionTableName & _
+currentdb.execute "INSERT INTO " & me.revisiontablename & _
     "(DatabaseVersion,Notes,ReleaseDate,ReleasedBy,DatabaseName)" & _
     " VALUES" & _
-    "('" & Me.releaseNum & "','" & Me.releaseNotes & "','" & Date & "','" & Me.responsiblePerson & "','" & Me.cmdRepo.Column(2) & "');"
-DoCmd.SetWarnings True
+    "('" & me.releasenum & "','" & me.releasenotes & "','" & date & "','" & me.responsibleperson & "','" & me.cmdrepo.column(2) & "');", dbfailonerror
 
-Dim body, strValues
-addNote "Generate notification email"
-body = emailContentGen("New Version Published", Me.cmdRepo.Column(2) & " " & Me.releaseNum & " Published", "Notes: " & Replace(Me.releaseNotes, ",", ";"), "Responsible: " & responsiblePerson, "Releaser: " & Environ("username"), "", "")
+dim body, strvalues
+addnote "Generate notification email"
+body = emailcontentgen("New Version Published", me.cmdrepo.column(2) & " " & me.releasenum & " Published", "Notes: " & replace(me.releasenotes, ",", ";"), "Responsible: " & responsibleperson, "Releaser: " & environ("username"), "", "")
 
-If Environ("username") <> "brownj" Then
-    strValues = "'brownj','brownj@us.nifco.com','" & Environ("username") & "','" & getEmail(Environ("username")) & "','" & Now() & "',1,1,'New Version Published','" & body & "','" & Now() & "'"
-    DoCmd.RunSQL "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strValues & ");"
-    addNote "Notification sent to brownj"
-End If
+if environ("username") <> "brownj" then
+    strvalues = "'brownj','brownj@us.nifco.com','" & environ("username") & "','" & getemail(environ("username")) & "','" & now() & "',1,1,'New Version Published','" & body & "','" & now() & "'"
+    currentdb.execute "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strvalues & ");", dbfailonerror
+    addnote "Notification sent to brownj"
+end if
 
-If Environ("username") <> "georgemi" Then
-    strValues = "'georgemi','georgemi@us.nifco.com','" & Environ("username") & "','" & getEmail(Environ("username")) & "','" & Now() & "',1,1,'New Version Published','" & body & "','" & Now() & "'"
-    DoCmd.SetWarnings False
-    DoCmd.RunSQL "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strValues & ");"
-    DoCmd.SetWarnings True
-    addNote "Notification sent to georgemi"
-End If
+if environ("username") <> "georgemi" then
+    strvalues = "'georgemi','georgemi@us.nifco.com','" & environ("username") & "','" & getemail(environ("username")) & "','" & now() & "',1,1,'New Version Published','" & body & "','" & now() & "'"
+    currentdb.execute "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strvalues & ");", dbfailonerror
+    addnote "Notification sent to georgemi"
+end if
 
-addNote "Version " & Me.releaseNum & " Notes Published Successfully"
+addnote "Version " & me.releasenum & " Notes Published Successfully"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub recomposeSendFile_Click()
-formStatus (True)
-Set fso = CreateObject("Scripting.FileSystemObject")
+private sub recomposesendfile_click()
+formstatus (true)
+set fso = createobject("Scripting.FileSystemObject")
 
-'---ADD ALL CHANGES FILES TO LIST---
-Dim results As String
-results = runGitCmd("git status")
+'---add all changes files to list---
+dim results as string
+results = rungitcmd("git status")
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * from tblFiles"
-DoCmd.SetWarnings True
+dim dbrecomp as database
+set dbrecomp = currentdb()
+dbrecomp.execute "DELETE * FROM tblFiles", dbfailonerror
 
-Dim arr() As String
-arr = Split(results, vbLf)
-DoCmd.SetWarnings False
-Dim ITEM
-For Each ITEM In arr
-    If InStr(ITEM, "modified:") Then DoCmd.RunSQL "INSERT INTO tblFiles(location) VALUES('" & Trim(Replace(ITEM, "modified:", "")) & " ')"
-Next ITEM
-DoCmd.SetWarnings True
+dim arr() as string
+arr = split(results, vblf)
 
-formStatus (False)
-End Sub
+dim item
+dim rsrecomp as dao.recordset
+set rsrecomp = dbrecomp.openrecordset("tblFiles", dbopendynaset, dbappendonly)
 
-Private Sub releaseHelp_Click()
-formStatus (True)
+for each item in arr
+    if instr(item, "modified:") then
+        rsrecomp.addnew
+        rsrecomp!location = trim(replace(item, "modified:", "")) & " "
+        rsrecomp.update
+    end if
+next item
 
-FollowHyperlink "https://github.com/workingdb/workingdb?tab=contributing-ov-file"
-addNote "Opened Help Page"
+rsrecomp.close
+set rsrecomp = nothing
+set dbrecomp = nothing
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub responsiblePerson_AfterUpdate()
-formStatus (True)
+private sub releasehelp_click()
+formstatus (true)
 
-If Me.Dirty Then Me.Dirty = False
-Me.userEmail = getEmail(Me.responsiblePerson)
-addNote "Populated User Email"
+followhyperlink "https://github.com/workingdb/workingdb?tab=contributing-ov-file"
+addnote "Opened Help Page"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub stageChanged_Click()
-formStatus (True)
-addNote "git add ."
+private sub responsibleperson_afterupdate()
+formstatus (true)
 
-Call runGitCmd("git add .")
-Call gitStatus_Click
+if me.dirty then me.dirty = false
+me.useremail = getemail(me.responsibleperson)
+addnote "Populated User Email"
 
-formStatus (False)
-End Sub
+formstatus (false)
+end sub
 
-Private Sub trackRevisions_Click()
-formStatus (True)
+private sub stagechanged_click()
+formstatus (true)
+addnote "git add ."
 
-Dim vis As Boolean
-vis = Me.trackRevisions
+call rungitcmd("git add .")
+call gitstatus_click
 
-Me.Label196.Visible = vis
-Me.revisionTableName.Visible = vis
-Me.publishNOTES.Visible = vis
-Me.releaseNum.Visible = vis
-Me.Label67.Visible = vis
-Me.Command76.Visible = vis
-Me.increaseRev.Visible = vis
-Me.responsiblePerson.Visible = vis
-Me.lblResp.Visible = vis
-Me.respBackg.Visible = vis
-Me.userEmail.Visible = vis
+formstatus (false)
+end sub
 
-formStatus (False)
-End Sub
+private sub trackrevisions_click()
+formstatus (true)
+
+dim vis as boolean
+vis = me.trackrevisions
+
+me.label196.visible = vis
+me.revisiontablename.visible = vis
+me.publishnotes.visible = vis
+me.releasenum.visible = vis
+me.label67.visible = vis
+me.command76.visible = vis
+me.increaserev.visible = vis
+me.responsibleperson.visible = vis
+me.lblresp.visible = vis
+me.respbackg.visible = vis
+me.useremail.visible = vis
+
+formstatus (false)
+end sub

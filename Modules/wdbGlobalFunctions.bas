@@ -1,125 +1,125 @@
-Option Compare Database
-Option Explicit
+option compare database
+option explicit
 
-Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal lpnShowCmd As Long) As Long
+declare ptrsafe function shellexecute lib "shell32.dll" alias "ShellExecuteA" (byval hwnd as long, byval lpoperation as string, byval lpfile as string, byval lpparameters as string, byval lpdirectory as string, byval lpnshowcmd as long) as long
 
-Function ToJson(ByVal dict As Object) As String
-    Dim key As Variant, result As String, value As String
+function tojson(byval dict as object) as string
+    dim key as variant, result as string, value as string
 
     result = "{"
-    For Each key In dict.Keys
-        result = result & IIf(Len(result) > 1, ",", "")
+    for each key in dict.keys
+        result = result & iif(len(result) > 1, ",", "")
 
-        If TypeName(dict(key)) = "Dictionary" Then
-            value = ToJson(dict(key))
-            ToJson = value
-        Else
+        if typename(dict(key)) = "Dictionary" then
+            value = tojson(dict(key))
+            tojson = value
+        else
             value = """" & dict(key) & """"
-        End If
+        end if
 
         result = result & """" & key & """:" & value & ""
-    Next key
+    next key
     result = result & "}"
 
-    ToJson = result
-End Function
+    tojson = result
+end function
 
 
 
-Public Function genEmail(Optional ByVal strTo As String = "", Optional ByVal strBCC As String = "", Optional ByVal strCC As String = "", Optional ByVal strSubject As String = "", Optional body As String = "") As Boolean
-genEmail = False
+public function genemail(optional byval strto as string = "", optional byval strbcc as string = "", optional byval strcc as string = "", optional byval strsubject as string = "", optional body as string = "") as boolean
+genemail = false
     
-Dim objEmail As Object
+dim objemail as object
 
-Set objEmail = CreateObject("outlook.Application")
-Set objEmail = objEmail.CreateItem(0)
+set objemail = createobject("outlook.Application")
+set objemail = objemail.createitem(0)
 
-With objEmail
-    .To = strTo
-    .CC = strCC
-    .BCC = strBCC
-    .subject = strSubject
-    .htmlBody = body
+with objemail
+    .to = strto
+    .cc = strcc
+    .bcc = strbcc
+    .subject = strsubject
+    .htmlbody = body
     .display
-End With
+end with
 
-Set objEmail = Nothing
+set objemail = nothing
 
-genEmail = True
-End Function
+genemail = true
+end function
 
-Public Sub openPath(Path)
-CreateObject("Shell.Application").Open CVar(Path)
-End Sub
+public sub openpath(path)
+createobject("Shell.Application").open cvar(path)
+end sub
 
-Function emailContentGen(subject As String, Title As String, subTitle As String, primaryMessage As String, detail1 As String, detail2 As String, detail3 As String) As String
-emailContentGen = subject & "," & Title & "," & subTitle & "," & primaryMessage & "," & detail1 & "," & detail2 & "," & detail3
-End Function
+function emailcontentgen(subject as string, title as string, subtitle as string, primarymessage as string, detail1 as string, detail2 as string, detail3 as string) as string
+emailcontentgen = subject & "," & title & "," & subtitle & "," & primarymessage & "," & detail1 & "," & detail2 & "," & detail3
+end function
 
-Function getEmail(userName As String) As String
-On Error Resume Next
+function getemail(username as string) as string
+on error resume next
 
-Dim db As Database
-Set db = CurrentDb()
+dim db as database
+set db = currentdb()
 
-Dim rsPermissions As Recordset
-Set rsPermissions = db.OpenRecordset("SELECT * from tblDeveloperInfo WHERE user = '" & userName & "'")
-getEmail = rsPermissions!Email
-rsPermissions.Close
+dim rspermissions as recordset
+set rspermissions = db.openrecordset("SELECT * from tblDeveloperInfo WHERE user = '" & username & "'")
+getemail = rspermissions!email
+rspermissions.close
 
-db.Close
+db.close
 
-End Function
+end function
 
-Function ap_DisableShift()
+function ap_disableshift()
 
-On Error GoTo errDisableShift
-Dim db As DAO.Database
-Dim prop As DAO.Property
-Const conPropNotFound = 3270
+on error goto errdisableshift
+dim db as dao.database
+dim prop as dao.property
+const conpropnotfound = 3270
 
-Set db = CurrentDb()
+set db = currentdb()
 
-db.Properties("AllowByPassKey") = False
-Exit Function
+db.properties("AllowByPassKey") = false
+exit function
 
-errDisableShift:
-If Err = conPropNotFound Then
-Set prop = db.CreateProperty("AllowByPassKey", dbBoolean, False)
-db.Properties.Append prop
-Resume Next
-Else
-MsgBox "Function 'ap_DisableShift' did not complete successfully."
-Exit Function
-End If
+errdisableshift:
+if err = conpropnotfound then
+set prop = db.createproperty("AllowByPassKey", dbboolean, false)
+db.properties.append prop
+resume next
+else
+msgbox "Function 'ap_DisableShift' did not complete successfully."
+exit function
+end if
 
-End Function
+end function
 
-Public Function StrQuoteReplace(strValue)
+public function strquotereplace(strvalue)
 
-StrQuoteReplace = Replace(Nz(strValue, ""), "'", "''")
+strquotereplace = replace(nz(strvalue, ""), "'", "''")
 
-End Function
+end function
 
-Function ap_EnableShift()
+function ap_enableshift()
 
-On Error GoTo errEnableShift
-Dim db As DAO.Database
-Dim prop As DAO.Property
-Const conPropNotFound = 3270
+on error goto errenableshift
+dim db as dao.database
+dim prop as dao.property
+const conpropnotfound = 3270
 
-Set db = CurrentDb()
-db.Properties("AllowByPassKey") = True
-Exit Function
+set db = currentdb()
+db.properties("AllowByPassKey") = true
+exit function
 
-errEnableShift:
-If Err = conPropNotFound Then
-Set prop = db.CreateProperty("AllowByPassKey", dbBoolean, True)
-db.Properties.Append prop
-Resume Next
-Else
-MsgBox "Function 'ap_DisableShift' did not complete successfully."
-Exit Function
-End If
+errenableshift:
+if err = conpropnotfound then
+set prop = db.createproperty("AllowByPassKey", dbboolean, true)
+db.properties.append prop
+resume next
+else
+msgbox "Function 'ap_DisableShift' did not complete successfully."
+exit function
+end if
 
-End Function
+end function

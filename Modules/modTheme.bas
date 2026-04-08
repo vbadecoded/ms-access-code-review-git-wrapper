@@ -1,275 +1,275 @@
-Option Compare Database
-Option Explicit
+option compare database
+option explicit
 
-'---this is an API for the color picker---
-'I use this on the frmThemeEditor to select colors in window
-Declare PtrSafe Sub ChooseColor Lib "msaccess.exe" Alias "#53" (ByVal hwnd As LongPtr, rgb As Long)
+'---this is an api for the color picker---
+'i use this on the frmthemeeditor to select colors in window
+declare ptrsafe sub choosecolor lib "msaccess.exe" alias "#53" (byval hwnd as longptr, rgb as long)
 
 
-Public Function setTheme(setForm As Form)
-'this is not an error prone routine... but IF there are errors - this is not one I typically track in my production FEs.
-'Feel free to add error trapping to this though. Could we worthwhile.
+public function settheme(setform as form)
+'this is not an error prone routine... but if there are errors - this is not one i typically track in my production fes.
+'feel free to add error trapping to this though. could we worthwhile.
 
-Dim colorLevArr() As String
+dim colorlevarr() as string
 
-Dim scalarBack As Double, scalarFront As Double, darkMode As Boolean
-Dim backBase As Long, foreBase As Long, backAccent As Long, colorLevels(4), backSecondary As Long, btnXback As Long, btnXbackShade As Long
+dim scalarback as double, scalarfront as double, darkmode as boolean
+dim backbase as long, forebase as long, backaccent as long, colorlevels(4), backsecondary as long, btnxback as long, btnxbackshade as long
 
-Dim ctl As Control, eachBtn As CommandButton
-Dim classColor As String, fadeBack, fadeFore
-Dim Level
-Dim backCol As Long, levFore As Double
-Dim disFore As Double
-Dim foreLevInt As Long, maxLev As Long
+dim ctl as control, eachbtn as commandbutton
+dim classcolor as string, fadeback, fadefore
+dim level
+dim backcol as long, levfore as double
+dim disfore as double
+dim forelevint as long, maxlev as long
 
-'IF NO THEME SET, APPLY DEFAULT THEME (for Dev mode mostly)
-If Nz(TempVars!themePrimary, "") = "" Then
-    TempVars.Add "themePrimary", 3355443
-    TempVars.Add "themeSecondary", 0
-    TempVars.Add "themeAccent", 5787704
-    TempVars.Add "themeMode", "Dark"
-    TempVars.Add "themeColorLevels", "1.3,1.6,1.9,2.2"
-End If
+'if no theme set, apply default theme (for dev mode mostly)
+if nz(tempvars!themeprimary, "") = "" then
+    tempvars.add "themePrimary", 3355443
+    tempvars.add "themeSecondary", 0
+    tempvars.add "themeAccent", 5787704
+    tempvars.add "themeMode", "Dark"
+    tempvars.add "themeColorLevels", "1.3,1.6,1.9,2.2"
+end if
 
-darkMode = TempVars!themeMode = "Dark"
+darkmode = tempvars!thememode = "Dark"
 
 'set some manual values based on dark/light theme.
 'the scalar values are somewhat arbitrary.
-If darkMode Then
-    foreBase = 16777215
-    btnXback = 4342397
-    scalarBack = 1.3
-    scalarFront = 0.9
-Else
-    foreBase = 657930
-    btnXback = 8947896
-    scalarBack = 1.1
-    scalarFront = 0.3
-End If
+if darkmode then
+    forebase = 16777215
+    btnxback = 4342397
+    scalarback = 1.3
+    scalarfront = 0.9
+else
+    forebase = 657930
+    btnxback = 8947896
+    scalarback = 1.1
+    scalarfront = 0.3
+end if
 
 'these are the raw base colors
-backBase = CLng(TempVars!themePrimary)
-backSecondary = CLng(TempVars!themeSecondary)
-backAccent = CLng(TempVars!themeAccent)
+backbase = clng(tempvars!themeprimary)
+backsecondary = clng(tempvars!themesecondary)
+backaccent = clng(tempvars!themeaccent)
 
-'to achieve the 5 'Levels' of controls, this array is the primary method.
-colorLevArr = Split(TempVars!themeColorLevels, ",")
+'to achieve the 5 'levels' of controls, this array is the primary method.
+colorlevarr = split(tempvars!themecolorlevels, ",")
 
-If backSecondary <> 0 Then 'if the theme contains a primary AND a secondary color
-    colorLevels(0) = backBase
-    colorLevels(1) = shadeColor(backSecondary, CDbl(colorLevArr(0)))
-    colorLevels(2) = shadeColor(backBase, CDbl(colorLevArr(1)))
-    colorLevels(3) = shadeColor(backSecondary, CDbl(colorLevArr(2)))
-    colorLevels(4) = shadeColor(backBase, CDbl(colorLevArr(3)))
-Else 'if the theme only contains a primary color
-    colorLevels(0) = backBase
-    colorLevels(1) = shadeColor(backBase, CDbl(colorLevArr(0)))
-    colorLevels(2) = shadeColor(backBase, CDbl(colorLevArr(1)))
-    colorLevels(3) = shadeColor(backBase, CDbl(colorLevArr(2)))
-    colorLevels(4) = shadeColor(backBase, CDbl(colorLevArr(3)))
-End If
+if backsecondary <> 0 then 'if the theme contains a primary and a secondary color
+    colorlevels(0) = backbase
+    colorlevels(1) = shadecolor(backsecondary, cdbl(colorlevarr(0)))
+    colorlevels(2) = shadecolor(backbase, cdbl(colorlevarr(1)))
+    colorlevels(3) = shadecolor(backsecondary, cdbl(colorlevarr(2)))
+    colorlevels(4) = shadecolor(backbase, cdbl(colorlevarr(3)))
+else 'if the theme only contains a primary color
+    colorlevels(0) = backbase
+    colorlevels(1) = shadecolor(backbase, cdbl(colorlevarr(0)))
+    colorlevels(2) = shadecolor(backbase, cdbl(colorlevarr(1)))
+    colorlevels(3) = shadecolor(backbase, cdbl(colorlevarr(2)))
+    colorlevels(4) = shadecolor(backbase, cdbl(colorlevarr(3)))
+end if
 
 'set the form parts themes
-On Error Resume Next
-setForm.FormHeader.BackColor = colorLevels(findColorLevel(setForm.FormHeader.Tag))
+on error resume next
+setform.formheader.backcolor = colorlevels(findcolorlevel(setform.formheader.tag))
 
-setForm.Detail.BackColor = colorLevels(findColorLevel(setForm.Detail.Tag))
-If Len(setForm.Detail.Tag) = 4 Then
-    setForm.Detail.AlternateBackColor = colorLevels(findColorLevel(setForm.Detail.Tag) + 1)
-Else
-    setForm.Detail.AlternateBackColor = setForm.Detail.BackColor
-End If
+setform.detail.backcolor = colorlevels(findcolorlevel(setform.detail.tag))
+if len(setform.detail.tag) = 4 then
+    setform.detail.alternatebackcolor = colorlevels(findcolorlevel(setform.detail.tag) + 1)
+else
+    setform.detail.alternatebackcolor = setform.detail.backcolor
+end if
 
-setForm.FormFooter.BackColor = colorLevels(findColorLevel(setForm.FormFooter.Tag))
-If Err.Number = 2462 Then Err.Clear
-'NOTE - this does assume form parts don't use tags for other purposes
+setform.formfooter.backcolor = colorlevels(findcolorlevel(setform.formfooter.tag))
+if err.number = 2462 then err.clear
+'note - this does assume form parts don't use tags for other purposes
 
-On Error GoTo 0
+on error goto 0
 
-'---PRIMARY THEME SETTING AREA---
-'a giant For Each with Select Cases. Not rocket science.
+'---primary theme setting area---
+'a giant for each with select cases. not rocket science.
 
-For Each ctl In setForm.Controls 'simply loop through all controls on the form
-    If Not ctl.Tag Like "*.L#*" Then GoTo nextControl 'is there a tag with a theme attribute on it? if not - skip this control
+for each ctl in setform.controls 'simply loop through all controls on the form
+    if not ctl.tag like "*.L#*" then goto nextcontrol 'is there a tag with a theme attribute on it? if not - skip this control
     
     '---
-    '---FOR ALL CONTROLS---
-    Level = findColorLevel(ctl.Tag)
-    backCol = colorLevels(Level)
-    foreLevInt = Level
-    If foreLevInt > 3 Then foreLevInt = 3
+    '---for all controls---
+    level = findcolorlevel(ctl.tag)
+    backcol = colorlevels(level)
+    forelevint = level
+    if forelevint > 3 then forelevint = 3
     
-    If darkMode Then
-        levFore = (1 / colorLevArr(foreLevInt)) + 0.2
-        disFore = 1.4 - levFore
-    Else
-        levFore = (colorLevArr(foreLevInt))
-        disFore = 15 - levFore
-    End If
+    if darkmode then
+        levfore = (1 / colorlevarr(forelevint)) + 0.2
+        disfore = 1.4 - levfore
+    else
+        levfore = (colorlevarr(forelevint))
+        disfore = 15 - levfore
+    end if
     
-    maxLev = Level + 1
-    If maxLev > 4 Then maxLev = 4
-    If ctl.Tag Like "*ContrastBorder*" Then
-        ctl.BorderColor = colorLevels(maxLev)
-    Else
-        ctl.BorderColor = backCol
-    End If
+    maxlev = level + 1
+    if maxlev > 4 then maxlev = 4
+    if ctl.tag like "*ContrastBorder*" then
+        ctl.bordercolor = colorlevels(maxlev)
+    else
+        ctl.bordercolor = backcol
+    end if
     
     '--now, find the control type and apply the applicable
-    Select Case ctl.ControlType
+    select case ctl.controltype
         '---
-        '---COMMAND BUTTON
-        Case acCommandButton, acToggleButton
-            ctl.BackColor = backCol
+        '---command button
+        case accommandbutton, actogglebutton
+            ctl.backcolor = backcol
             
             '---this is for swapping out button icons for light / dark theme icons - turned off by default---
-            '            If (ctl.Picture = "") Then GoTo skipAhead0
-            '            If darkMode Then
-            '                If InStr(ctl.Picture, "\Core_theme_light\") Then ctl.Picture = Replace(ctl.Picture, "\Core_theme_light\", "\Core\")
-            '            Else
-            '                If InStr(ctl.Picture, "\Core\") Then ctl.Picture = Replace(ctl.Picture, "\Core\", "\Core_theme_light\")
-            '            End If
+            '            if (ctl.picture = "") then goto skipahead0
+            '            if darkmode then
+            '                if instr(ctl.picture, "\Core_theme_light\") then ctl.picture = replace(ctl.picture, "\Core_theme_light\", "\Core\")
+            '            else
+            '                if instr(ctl.picture, "\Core\") then ctl.picture = replace(ctl.picture, "\Core\", "\Core_theme_light\")
+            '            end if
             '---
             
             
             '---test for individual attributes---
             
-            If ctl.Tag Like "*dis*" Then
-                fadeFore = shadeColor(foreBase, disFore)
-                ctl.ForeColor = fadeFore
-                ctl.HoverForeColor = fadeFore
-                ctl.PressedForeColor = fadeFore
-            Else
-                fadeFore = shadeColor(foreBase, levFore - 0.2)
-                ctl.ForeColor = foreBase
-                ctl.HoverForeColor = foreBase
-                ctl.PressedForeColor = foreBase
-            End If
+            if ctl.tag like "*dis*" then
+                fadefore = shadecolor(forebase, disfore)
+                ctl.forecolor = fadefore
+                ctl.hoverforecolor = fadefore
+                ctl.pressedforecolor = fadefore
+            else
+                fadefore = shadecolor(forebase, levfore - 0.2)
+                ctl.forecolor = forebase
+                ctl.hoverforecolor = forebase
+                ctl.pressedforecolor = forebase
+            end if
             
-            If ctl.Tag Like "*btnX*" Then
-                fadeBack = shadeColor(btnXback, scalarBack)
-                btnXbackShade = shadeColor(btnXback, (0.1 * Level) + scalarBack)
-                ctl.BackColor = btnXbackShade
-                ctl.BorderColor = btnXback
-            Else
-                fadeBack = shadeColor(backCol, scalarBack)
-            End If
+            if ctl.tag like "*btnX*" then
+                fadeback = shadecolor(btnxback, scalarback)
+                btnxbackshade = shadecolor(btnxback, (0.1 * level) + scalarback)
+                ctl.backcolor = btnxbackshade
+                ctl.bordercolor = btnxback
+            else
+                fadeback = shadecolor(backcol, scalarback)
+            end if
             
-            If ctl.Tag Like "*accentBtn*" Then
-                fadeBack = shadeColor(backAccent, (0.2 * Level) + scalarBack)
-                ctl.BackColor = shadeColor(backAccent, scalarBack)
-                ctl.Gradient = 17
-            End If
+            if ctl.tag like "*accentBtn*" then
+                fadeback = shadecolor(backaccent, (0.2 * level) + scalarback)
+                ctl.backcolor = shadecolor(backaccent, scalarback)
+                ctl.gradient = 17
+            end if
             
-            ctl.HoverColor = fadeBack
-            ctl.PressedColor = fadeBack
+            ctl.hovercolor = fadeback
+            ctl.pressedcolor = fadeback
             
-            If ctl.Tag Like "*cardBtn*" Then
-                ctl.HoverColor = backCol
-                ctl.PressedColor = backCol
-            End If
+            if ctl.tag like "*cardBtn*" then
+                ctl.hovercolor = backcol
+                ctl.pressedcolor = backcol
+            end if
         '---
-        '---LABEL
-        Case acLabel
-            ctl.ForeColor = shadeColor(foreBase, levFore)
-            If ctl.Tag Like "*lbl_wBack.L#*" Then ctl.BackColor = backCol
+        '---label
+        case aclabel
+            ctl.forecolor = shadecolor(forebase, levfore)
+            if ctl.tag like "*lbl_wBack.L#*" then ctl.backcolor = backcol
         '---
-        '---TEXT BOX
-        Case acTextBox, acComboBox
-            ctl.BackColor = backCol
-            If ctl.Tag Like "*txtTransFore*" Then
-                ctl.ForeColor = backCol
-            ElseIf ctl.Tag Like "*txtErr*" Then
-                ctl.BorderColor = btnXback
-                ctl.BorderStyle = 1
-                ctl.ForeColor = foreBase
-            Else
-                ctl.ForeColor = foreBase
-            End If
+        '---text box
+        case actextbox, accombobox
+            ctl.backcolor = backcol
+            if ctl.tag like "*txtTransFore*" then
+                ctl.forecolor = backcol
+            elseif ctl.tag like "*txtErr*" then
+                ctl.bordercolor = btnxback
+                ctl.borderstyle = 1
+                ctl.forecolor = forebase
+            else
+                ctl.forecolor = forebase
+            end if
             
-            If ctl.FormatConditions.Count = 1 Then 'special case for null value conditional formatting. Typically this is used for placeholder values
-                If ctl.FormatConditions.ITEM(0).Expression1 Like "*IsNull*" Then
-                    ctl.FormatConditions.ITEM(0).BackColor = backCol
-                    ctl.FormatConditions.ITEM(0).ForeColor = foreBase
-                End If
-            End If
+            if ctl.formatconditions.count = 1 then 'special case for null value conditional formatting. typically this is used for placeholder values
+                if ctl.formatconditions.item(0).expression1 like "*IsNull*" then
+                    ctl.formatconditions.item(0).backcolor = backcol
+                    ctl.formatconditions.item(0).forecolor = forebase
+                end if
+            end if
         '---
-        '---BOX / SUBFORM
-        Case acRectangle, acSubform
-            If Not ctl.Name Like "sfrm*" Then ctl.BackColor = backCol
+        '---box / subform
+        case acrectangle, acsubform
+            if not ctl.name like "sfrm*" then ctl.backcolor = backcol
         '---
-        '---TAB CONTROL
-        Case acTabCtl
-            ctl.PressedColor = backCol
-            fadeBack = shadeColor(CLng(colorLevels(Level - 1)), scalarBack)
-            ctl.HoverColor = fadeBack
-            ctl.HoverForeColor = foreBase
-            ctl.PressedForeColor = foreBase
-            If Level = 0 Then
-                ctl.BackColor = colorLevels(Level + 0)
-                fadeFore = shadeColor(foreBase, levFore - 0.6)
-                ctl.ForeColor = fadeFore
-            Else
-                ctl.BackColor = colorLevels(Level - 1)
-                fadeFore = shadeColor(foreBase, levFore)
-                ctl.ForeColor = fadeFore
-            End If
+        '---tab control
+        case actabctl
+            ctl.pressedcolor = backcol
+            fadeback = shadecolor(clng(colorlevels(level - 1)), scalarback)
+            ctl.hovercolor = fadeback
+            ctl.hoverforecolor = forebase
+            ctl.pressedforecolor = forebase
+            if level = 0 then
+                ctl.backcolor = colorlevels(level + 0)
+                fadefore = shadecolor(forebase, levfore - 0.6)
+                ctl.forecolor = fadefore
+            else
+                ctl.backcolor = colorlevels(level - 1)
+                fadefore = shadecolor(forebase, levfore)
+                ctl.forecolor = fadefore
+            end if
         '---
-        '---PICTURE
-        Case acImage
-            ctl.BackColor = backCol
-    End Select
+        '---picture
+        case acimage
+            ctl.backcolor = backcol
+    end select
     
-nextControl:
-Next
+nextcontrol:
+next
 
-End Function
+end function
 
-Function findColorLevel(tagText As String) As Long
+function findcolorlevel(tagtext as string) as long
 
-findColorLevel = 0
-If tagText = "" Then Exit Function
+findcolorlevel = 0
+if tagtext = "" then exit function
 
-findColorLevel = Mid(tagText, InStr(tagText, ".L") + 2, 1)
+findcolorlevel = mid(tagtext, instr(tagtext, ".L") + 2, 1)
 
-End Function
+end function
 
-Function shadeColor(inputColor As Long, scalar As Double) As Long
+function shadecolor(inputcolor as long, scalar as double) as long
 
-Dim tempHex, ioR, ioG, ioB
+dim temphex, ior, iog, iob
 
-tempHex = Hex(inputColor)
+temphex = hex(inputcolor)
 
-If tempHex = "0" Then tempHex = "111111"
+if temphex = "0" then temphex = "111111"
 
-If Len(tempHex) = 1 Then tempHex = "0" & tempHex
-If Len(tempHex) = 2 Then tempHex = "0" & tempHex
-If Len(tempHex) = 3 Then tempHex = "0" & tempHex
-If Len(tempHex) = 4 Then tempHex = "0" & tempHex
-If Len(tempHex) = 5 Then tempHex = "0" & tempHex
+if len(temphex) = 1 then temphex = "0" & temphex
+if len(temphex) = 2 then temphex = "0" & temphex
+if len(temphex) = 3 then temphex = "0" & temphex
+if len(temphex) = 4 then temphex = "0" & temphex
+if len(temphex) = 5 then temphex = "0" & temphex
 
-ioR = Val("&H" & Mid(tempHex, 5, 2)) * scalar
-ioG = Val("&H" & Mid(tempHex, 3, 2)) * scalar
-ioB = Val("&H" & Mid(tempHex, 1, 2)) * scalar
+ior = val("&H" & mid(temphex, 5, 2)) * scalar
+iog = val("&H" & mid(temphex, 3, 2)) * scalar
+iob = val("&H" & mid(temphex, 1, 2)) * scalar
 
-'Debug.Print ioR & " "; ioG & " " & ioB
+'debug.print ior & " "; iog & " " & iob
 
-If ioR > 255 Then ioR = 255
-If ioG > 255 Then ioG = 255
-If ioB > 255 Then ioB = 255
+if ior > 255 then ior = 255
+if iog > 255 then iog = 255
+if iob > 255 then iob = 255
 
-If ioR < 0 Then ioR = 0
-If ioG < 0 Then ioG = 0
-If ioB < 0 Then ioB = 0
+if ior < 0 then ior = 0
+if iog < 0 then iog = 0
+if iob < 0 then iob = 0
 
-shadeColor = rgb(ioR, ioG, ioB)
+shadecolor = rgb(ior, iog, iob)
 
-End Function
+end function
 
-Public Function colorPicker(Optional lngColor As Long) As Long
+public function colorpicker(optional lngcolor as long) as long
 
-    'Static lngColor As Long
-    ChooseColor Application.hWndAccessApp, lngColor
-    colorPicker = lngColor
+    'static lngcolor as long
+    choosecolor application.hwndaccessapp, lngcolor
+    colorpicker = lngcolor
 
-End Function
+end function

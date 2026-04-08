@@ -1,724 +1,899 @@
-Option Compare Database
-Option Explicit
+option compare database
+option explicit
 
-Function cleanDatabase() As Boolean
+private declare ptrsafe sub sleep lib "kernel32" (byval dwmilliseconds as long)
 
-cleanDatabase = False
+function cleandatabase() as boolean
 
-Dim errorMsg As New Collection, fso As Object
-If Nz(Form__MAIN.releaseNotes, "") = "" Then errorMsg.Add "Empty release notes"
+cleandatabase = false
 
-If errorMsg.Count > 0 Then
-    Dim msgContents As String, ITEM
-    msgContents = ""
-    For Each ITEM In errorMsg
-        msgContents = msgContents & vbNewLine & ITEM
-    Next ITEM
-    MsgBox msgContents, vbInformation, "Please fix these issues: "
-    GoTo exitThis
-End If
+' --- validation ---
+dim errormsg as new collection
+if nz(form__main.releasenotes, "") = "" then errormsg.add "Empty release notes"
 
-If MsgBox("Are you sure? ", vbYesNo, "Just Checking") = vbNo Then GoTo exitThis
+if errormsg.count > 0 then
+    dim msgcontents as string, item
+    for each item in errormsg
+        msgcontents = msgcontents & vbnewline & item
+    next item
+    msgbox msgcontents, vbinformation, "Please fix these issues: "
+    exit function
+end if
 
-addNote "--- STARTING " & Form__MAIN.cmdRepo.Column(2) & " CLEANING PROCEDURE ---"
+if msgbox("Are you sure? ", vbyesno, "Just Checking") = vbno then exit function
 
-'---Setup Variables
-addNote "establishing variables..."
+addnote "--- STARTING " & form__main.cmdrepo.column(2) & " CLEANING PROCEDURE ---"
 
-Set fso = CreateObject("Scripting.FileSystemObject")
+' --- setup variables (safe add — remove first if exists) ---
+addnote "Establishing variables..."
 
-TempVars.Add "releaseNum", Form__MAIN.releaseNum.value
-TempVars.Add "releaseNotes", Replace(Form__MAIN.releaseNotes.value, "'", "''")
-TempVars.Add "responsiblePerson", Form__MAIN.responsiblePerson.value
-TempVars.Add "userEmail", Form__MAIN.userEmail.value
-TempVars.Add "databaseName", Form__MAIN.cmdRepo.Column(2)
+dim fso as object
+set fso = createobject("Scripting.FileSystemObject")
 
-Dim repoLoc As String
-repoLoc = Form__MAIN.cmdRepo
-TempVars.Add "devFile", getDB
+dim repoloc as string, devfile as string, dbname as string
+repoloc = form__main.cmdrepo
+devfile = getdb
+dbname = form__main.cmdrepo.column(2)
 
-Dim devBackup, devTemp, feFile
+safeaddtempvar "releaseNum", form__main.releasenum.value
+safeaddtempvar "releaseNotes", replace(form__main.releasenotes.value, "'", "''")
+safeaddtempvar "responsiblePerson", form__main.responsibleperson.value
+safeaddtempvar "userEmail", form__main.useremail.value
+safeaddtempvar "databaseName", dbname
+safeaddtempvar "devFile", devfile
 
-'---Open DEV to finalize---
-'-if Front End
-If Form__MAIN.cmdRepo.Column(2) = "WorkingDB_FE.accdb" Then
-    addNote "Opening database for cleaning/compiling"
-    Dim dbInput, dbInputRS As Database
+' --- front-end specific cleanup ---
+if dbname = "WorkingDB_FE.accdb" then
+    addnote "Opening database for cleaning/compiling"
+    dim dbinputrs as database
     
-    Set dbInputRS = OpenDatabase(TempVars!devFile)
-    dbInputRS.Execute "DELETE FROM tblPLM"
-    dbInputRS.Execute "Delete * from tblSessionVariables"
-    dbInputRS.Execute "Update [tblDBinfo] SET [Release] = '" & TempVars!releaseNum & "' WHERE [ID] = 1"
-    dbInputRS.Close
-    Set dbInputRS = Nothing
+    set dbinputrs = opendatabase(devfile)
+    dbinputrs.execute "DELETE FROM tblPLM"
+    dbinputrs.execute "DELETE * FROM tblSessionVariables"
+    dbinputrs.execute "UPDATE [tblDBinfo] SET [Release] = '" & tempvars!releasenum & "' WHERE [ID] = 1"
+    dbinputrs.close
+    set dbinputrs = nothing
     
-    Set dbInput = CreateObject("Access.Application")
-    dbInput.OpenCurrentDatabase TempVars!devFile
-    dbInput.runCommand acCmdCloseAll
+    ' run readyforpublish check — reuse this instance for decompile too
+    addnote "Running readyForPublish check..."
+    dim dbinput as object
+    set dbinput = createobject("Access.Application")
+    dbinput.opencurrentdatabase devfile
+    dbinput.runcommand accmdcloseall
     
-    Dim checkThis
-    Do
-        checkThis = dbInput.Run("readyForPublish")
-    Loop Until checkThis = True
+    do
+    loop until dbinput.run("readyForPublish") = true
     
-    dbInput.CloseCurrentDatabase
-    dbInput.Quit
+    dbinput.closecurrentdatabase
+    dbinput.quit
+    set dbinput = nothing
     
-    Dim BEbackup
-    TempVars.Add "dbLoc", "\\data\mdbdata\WorkingDB\"
-    BEbackup = TempVars!dbLoc & "_backups\prod-BE\"
+    ' backup backends
+    dim dbloc as string, bebackup as string
+    dbloc = "\\data\mdbdata\WorkingDB\"
+    bebackup = dbloc & "_backups\prod-BE\"
     
-    addNote "Backup backends"
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_DesignE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_DesignE.accdb")
-    Call fso.CopyFile(TempVars!dbLoc & "prod-BE\WorkingDB_BE_ProjectE.accdb", BEbackup & TempVars!releaseNum & "_WorkingDB_BE_ProjectE.accdb")
-End If
-
-addNote "Enable Shift Bypass"
-
-'---Enable Shift---
-Call shiftKeyBypass(TempVars!devFile, True)
-
-'---Decompile---
-addNote "Decompile"
-MsgBox "Hold shift as you click OK - then close the database", vbInformation, "Up Next"
-openPath (repoLoc & "decompile.cmd")
-MsgBox "Once the database is closed, then click OK", vbInformation, "Up Next"
-
-'---Compact / Repair Dev into Temp---
-addNote "Compacting dev into temp file"
-
-TempVars.Add "devTemp", repoLoc & "temp.accdb"
-Application.CompactRepair TempVars!devFile, TempVars!devTemp
-fso.DeleteFile (TempVars!devFile)
-
-'---Compile Temp File---
-addNote "Compile"
-Dim dbTemp
-Set dbTemp = CreateObject("Access.Application")
-MsgBox "Hold shift as you click OK", vbInformation, "Up Next"
-dbTemp.OpenCurrentDatabase TempVars!devTemp
-dbTemp.Visible = False
-dbTemp.runCommand acCmdCloseAll
-
-Dim compileMe
-Set compileMe = dbTemp.VBE.CommandBars.FindControl(msoControlButton, 578)
-If compileMe.Enabled Then compileMe.Execute
-
-dbTemp.runCommand acCmdCompileAndSaveAllModules
-dbTemp.CurrentDb.Properties("AllowByPassKey") = True
-If fso.FolderExists("H:\wdbBackups\") = False Then MkDir ("H:\wdbBackups\")
-addNote "Backup temp into homedrive"
-devBackup = "H:\wdbBackups\WorkingDB_Dev_backup.accdb"
-Call fso.CopyFile(TempVars!devTemp, devBackup)
-
-addNote "Disable shift bypass"
-dbTemp.CurrentDb.Properties("AllowByPassKey") = False
-addNote "Close temp file"
-dbTemp.CloseCurrentDatabase
-dbTemp.Quit
-DoEvents
-
-'---Compact Temp into Dev---
-addNote "Compacting temp file back into FE"
-Application.CompactRepair TempVars!devTemp, TempVars!devFile
-fso.DeleteFile (TempVars!devTemp)
-
-addNote Form__MAIN.cmdRepo.Column(2) & " CLEANED"
-
-cleanDatabase = True
-exitThis:
-
-End Function
-
-Function getRepoInfo(repoLocation) As Boolean
-getRepoInfo = False
-
-If Form__MAIN.trackRevisions Then
-    'grab lastest revision
-    addNote "Getting " & Form__MAIN.cmdRepo & " latest revision"
+    addnote "Backup backends"
+    dim befiles as variant
+    befiles = array("WorkingDB_BE.accdb", "WorkingDB_BE_DesignE.accdb", "WorkingDB_BE_ProjectE.accdb")
     
-    Dim maxRel
-    maxRel = DMax("ID", Form__MAIN.revisionTableName, "databaseName = '" & Form__MAIN.cmdRepo.Column(2) & "'")
+    dim i as long
+    for i = lbound(befiles) to ubound(befiles)
+        fso.copyfile dbloc & "prod-BE\" & befiles(i), bebackup & tempvars!releasenum & "_" & befiles(i)
+    next i
+end if
+
+' --- enable shift bypass + decompile in one access instance ---
+addnote "Enable Shift Bypass + Decompile"
+dim accdecompile as object
+set accdecompile = createobject("Access.Application")
+
+' set bypass via dbengine (no startup code)
+accdecompile.dbengine.opendatabase(devfile, false, false).properties("AllowByPassKey") = true
+
+' now decompile using the same instance — /decompile flag compiles then removes compiled state
+addnote "Decompiling..."
+accdecompile.opencurrentdatabase devfile, false  ' false = don't execute startup
+accdecompile.runcommand accmdcloseall
+accdecompile.closecurrentdatabase
+accdecompile.quit
+set accdecompile = nothing
+
+' --- compact / repair dev into temp ---
+addnote "Compacting dev into temp file"
+dim devtemp as string
+devtemp = repoloc & "temp.accdb"
+application.compactrepair devfile, devtemp
+fso.deletefile devfile
+
+' --- compile temp file ---
+' reuse a single access instance for compile + backup
+addnote "Compile"
+call shiftkeybypass(devtemp, true)
+
+dim dbtemp as object
+set dbtemp = createobject("Access.Application")
+dbtemp.opencurrentdatabase devtemp
+dbtemp.visible = false
+dbtemp.runcommand accmdcloseall
+
+dim compileme as object
+set compileme = dbtemp.vbe.commandbars.findcontrol(msocontrolbutton, 578)
+if compileme.enabled then compileme.execute
+
+dbtemp.runcommand accmdcompileandsaveallmodules
+
+' backup to home drive
+dim backupdir as string
+backupdir = "H:\wdbBackups\"
+if not fso.folderexists(backupdir) then mkdir backupdir
+addnote "Backup temp into homedrive"
+fso.copyfile devtemp, backupdir & "WorkingDB_Dev_backup.accdb"
+
+' disable shift bypass and close
+addnote "Disable shift bypass"
+dbtemp.currentdb.properties("AllowByPassKey") = false
+addnote "Close temp file"
+dbtemp.closecurrentdatabase
+dbtemp.quit
+set dbtemp = nothing
+doevents
+
+' --- compact temp back into dev ---
+addnote "Compacting temp file back into FE"
+application.compactrepair devtemp, devfile
+fso.deletefile devtemp
+
+set fso = nothing
+addnote dbname & " CLEANED"
+
+cleandatabase = true
+
+end function
+
+private sub safeaddtempvar(varname as string, varvalue as variant)
+    on error resume next
+    tempvars.remove varname
+    on error goto 0
+    tempvars.add varname, varvalue
+end sub
+
+function getrepoinfo(repolocation as string) as boolean
+getrepoinfo = false
+
+if form__main.trackrevisions then
+    addnote "Getting " & form__main.cmdrepo & " latest revision"
     
-    Form__MAIN.releaseNum = DLookup("DatabaseVersion", Form__MAIN.revisionTableName, "ID = " & Nz(maxRel, 0))
-End If
+    dim maxrel as variant
+    maxrel = dmax("ID", form__main.revisiontablename, "databaseName = '" & form__main.cmdrepo.column(2) & "'")
+    
+    form__main.releasenum = dlookup("DatabaseVersion", form__main.revisiontablename, "ID = " & nz(maxrel, 0))
+end if
 
 'find current branch
-Form__MAIN.gitbranch = runGitCmd("git branch --show-current")
+form__main.gitbranch = rungitcmd("git branch --show-current")
 
 'list branches
-Form__MAIN.gitbranch.RowSource = Replace(Replace(runGitCmd("git branch"), vbLf, ";"), "*", "")
-Form__MAIN.gitBranchSelect.RowSource = Form__MAIN.gitbranch.RowSource
+form__main.gitbranch.rowsource = replace(replace(rungitcmd("git branch"), vblf, ";"), "*", "")
+form__main.gitbranchselect.rowsource = form__main.gitbranch.rowsource
 
-Form__MAIN.publishChanges.Visible = Nz(Form__MAIN.cmdRepo.Column(1), "") <> ""
+form__main.publishchanges.visible = nz(form__main.cmdrepo.column(1), "") <> ""
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "UPDATE tblLastUsed SET repoLocation = '" & repoLocation & "' WHERE recordId = 1"
-DoCmd.SetWarnings True
+currentdb.execute "UPDATE tblLastUsed SET repoLocation = '" & repolocation & "' WHERE recordId = 1", dbfailonerror
 
-getRepoInfo = True
-End Function
+getrepoinfo = true
+end function
 
-Function getDB() As String
-getDB = Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2)
-End Function
+function getdb() as string
+getdb = form__main.cmdrepo & form__main.cmdrepo.column(2)
+end function
 
-Function shiftKeyBypass(location As String, toggle As Boolean) As Boolean
-shiftKeyBypass = False
-On Error GoTo errEnableShift
+function shiftkeybypass(location as string, toggle as boolean) as boolean
+shiftkeybypass = false
+on error goto errhandler
 
-'initialize variables
-Dim db As DAO.Database, acc
-Dim prop As DAO.Property
-Const conPropNotFound = 3270
+dim db as dao.database
+dim acc as object
+dim prop as dao.property
+const conpropnotfound = 3270
   
-'open the database as an Access object
-Set acc = CreateObject("Access.Application")
+set acc = createobject("Access.Application")
+set db = acc.dbengine.opendatabase(location, false, false)
 
-'open the "database" now within that object
-Set db = acc.dbEngine.OpenDatabase(location, False, False)
+db.properties("AllowByPassKey") = toggle
+shiftkeybypass = true
 
-'run the command
-db.Properties("AllowByPassKey") = toggle
-shiftKeyBypass = True
-GoTo exitThis
+exitthis:
+on error resume next
+if not (db is nothing) then db.close
+set db = nothing
+if not (acc is nothing) then acc.quit
+set acc = nothing
+exit function
 
-errEnableShift:
-If Err = conPropNotFound Then
-    Set prop = db.CreateProperty("AllowByPassKey", dbBoolean, toggle)
-    db.Properties.Append prop
-    Resume Next
-    shiftKeyBypass = True
-    GoTo exitThis
-End If
+errhandler:
+if err.number = conpropnotfound then
+    set prop = db.createproperty("AllowByPassKey", dbboolean, toggle)
+    db.properties.append prop
+    shiftkeybypass = true
+    resume exitthis
+end if
 
-shiftKeyBypass = False
-MsgBox "error! Maybe you alread have it open? Please close if so."
+msgbox "Error: Maybe you already have it open? Please close if so." & vbnewline & _
+       "Details: " & err.description, vbexclamation, "Shift Bypass Failed"
+resume exitthis
 
-exitThis: 'clear your objects/detach from the database
-If Not (db Is Nothing) Then db.Close
-Set db = Nothing
-Set acc = Nothing
+end function
 
-shiftKeyBypass = True
-End Function
+function rungitcmd(inputcmd as string, optional dir as string = "current", optional printall as boolean = true, optional printnone as boolean = false) as string
 
-Function runGitCmd(inputCmd As String, Optional dir As String = "current", Optional printAll As Boolean = True, Optional printNone As Boolean = False) As String
+dim wsshell as object
+dim sworkingdirectory as string
+dim stroutput as string, strerror as string
 
-Dim wsShell As Object
-Dim execObject As Object
-Dim sOutput As String
-Dim sWorkingDirectory As String
+' set the working directory to your git repository
+rungitcmd = ""
+if isnull(form__main.cmdrepo) then exit function
+if dir = "current" then
+    sworkingdirectory = form__main.cmdrepo
+else
+    sworkingdirectory = dir
+end if
 
-' Set the working directory to your Git repository
-runGitCmd = ""
-If IsNull(Form__MAIN.cmdRepo) Then Exit Function
-If dir = "current" Then
-    sWorkingDirectory = Form__MAIN.cmdRepo
-Else
-    sWorkingDirectory = dir
-End If
+set wsshell = createobject("WScript.Shell")
+wsshell.currentdirectory = sworkingdirectory
 
+select case inputcmd
+    case "git commit -a"
+        inputcmd = inputcmd & " -m """ & form__main.releasenotes & """"
+end select
 
-Set wsShell = CreateObject("WScript.Shell")
-wsShell.CurrentDirectory = sWorkingDirectory
+' use .run with hidden window (0) and redirect stdout + stderr to temp files
+dim tmpout as string, tmperr as string
+tmpout = environ("temp") & "\git_stdout.txt"
+tmperr = environ("temp") & "\git_stderr.txt"
 
-Select Case inputCmd
-    Case "git commit -a"
-        inputCmd = inputCmd & " -m """ & Form__MAIN.releaseNotes & """"
-End Select
+wsshell.run "cmd /c " & inputcmd & " > """ & tmpout & """ 2> """ & tmperr & """", 0, true
 
-With CreateObject("WScript.Shell")
-    .Run "cmd /c " & inputCmd & " > %temp%\tempgitoutput.txt", 0, True
-End With
+' read stdout
+dim fso as object
+set fso = createobject("Scripting.FileSystemObject")
 
-On Error Resume Next
-Dim strOutput
-With CreateObject("Scripting.FileSystemObject")
-    strOutput = .openTextFile(Environ("temp") & "\tempgitoutput.txt").ReadAll()
-    .DeleteFile Environ("temp") & "\tempgitoutput.txt"
-End With
-On Error GoTo 0
+stroutput = ""
+if fso.fileexists(tmpout) then
+    if fso.getfile(tmpout).size > 0 then
+        stroutput = fso.opentextfile(tmpout).readall()
+    end if
+    fso.deletefile tmpout
+end if
 
+' read stderr
+strerror = ""
+if fso.fileexists(tmperr) then
+    if fso.getfile(tmperr).size > 0 then
+        strerror = fso.opentextfile(tmperr).readall()
+    end if
+    fso.deletefile tmperr
+end if
 
-Dim arr() As String
-arr = Split(strOutput, vbLf)
+set fso = nothing
 
-Dim ITEM, startChanges As Boolean
-startChanges = False
+' log any errors from stderr
+if len(strerror) > 0 then
+    addnote "GIT ERROR: " & strerror
+end if
 
-If printNone Then GoTo noPrint
+dim arr() as string
+arr = split(stroutput, vblf)
 
-DoCmd.SetWarnings False
-For Each ITEM In arr
-    If ITEM = "" Then startChanges = True
+dim item, startchanges as boolean
+startchanges = false
+
+if printnone then goto noprint
+
+' use recordset.addnew for bulk inserts — much faster than docmd.runsql per row
+dim db as database, rs as dao.recordset
+set db = currentdb()
+set rs = db.openrecordset("tblReleaseTracking", dbopendynaset, dbappendonly)
+
+for each item in arr
+    if item = "" then startchanges = true
     
-    If startChanges = True And printAll = False Then GoTo noPrint
-    DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(ITEM) & " ')"
+    if startchanges = true and printall = false then
+        rs.close
+        goto noprint
+    end if
     
-Next ITEM
+    rs.addnew
+    rs!task = item & " "
+    rs.update
+next item
 
-noPrint:
-DoCmd.SetWarnings True
+rs.close
+set rs = nothing
+set db = nothing
 
-On Error Resume Next
-Form_sfrmTracking.Requery
+noprint:
 
-moveTrackingToLastRecord
+on error resume next
+form_sfrmtracking.requery
 
-runGitCmd = strOutput
+movetrackingtolastrecord
 
-Set execObject = Nothing
-Set wsShell = Nothing
+rungitcmd = stroutput
 
-End Function
+set wsshell = nothing
 
-Function moveTrackingToLastRecord()
+end function
 
-Dim rs As DAO.Recordset
-Dim lNumRec As Long
-Dim lNoRecOnForm As Long
+function movetrackingtolastrecord()
 
-Set rs = Form_sfrmTracking.RecordsetClone ' Create a clone of the form's recordset
-rs.MoveLast ' Move to the last record in the recordset
-lNumRec = rs.RecordCount ' Get the total number of records
+on error resume next
 
-' Calculate how many records are visible on the form
-lNoRecOnForm = Int(Form_sfrmTracking.InsideHeight / Form_sfrmTracking.Section(acDetail).Height)
+' set focus to the subform control so we can navigate it
+form__main.sfrmtracking.setfocus
 
-' Move the recordset to position the last visible record at the bottom
-If lNumRec > lNoRecOnForm Then
-    rs.MoveFirst
-    rs.Move (lNumRec - lNoRecOnForm)
-Else
-    rs.MoveFirst ' If fewer records than can be displayed, go to the first
-End If
+' use recordsetclone to move to the last record
+dim rs as dao.recordset
+set rs = form_sfrmtracking.recordsetclone
 
-Form_sfrmTracking.Bookmark = rs.Bookmark ' Set the form's bookmark to the calculated position
-Form_sfrmTracking.Refresh
+if rs.recordcount > 0 then
+    rs.movelast
+    form_sfrmtracking.bookmark = rs.bookmark
+end if
 
-Set rs = Nothing ' Release the recordset object
+set rs = nothing
 
-End Function
+end function
 
-Function recomposeAccdb(importTo As String)
+function recomposeaccdb()
 
-imortTo = "H:\dev\workingdb\WorkingDB_FE - Copy.accdb"
+dim fso as object
+set fso = createobject("Scripting.FileSystemObject")
 
-'---RECOMPOSE---
-Dim myComponent
-Dim sModuleType
-Dim sTempname
-Dim sOutstring
+dim repo as string, dbsource as string, importto as string
+repo = form__main.cmdrepo
+dbsource = repo & form__main.cmdrepo.column(2)
 
-Dim myPath, repo
-Dim fso As Object
-Set fso = CreateObject("Scripting.FileSystemObject")
+' create a working copy of the .accdb to import into
+importto = repo & "recompose_temp.accdb"
+if fso.fileexists(importto) then fso.deletefile importto
+addnote "Copying " & form__main.cmdrepo.column(2) & " to temp file..."
+fso.copyfile dbsource, importto
 
-'importTo = Form__MAIN.cmdRepo & "temp.accdb"
-'fso.CopyFile Form__MAIN.cmdRepo & Form__MAIN.cmdRepo.Column(2), importTo
-repo = "H:\dev\workingdb\"
-myPath = fso.getparentfoldername(importTo)
+' ask user: import all modified files or only selected?
+dim importmode as integer
+importmode = msgbox("Yes = Import ALL modified files" & vbnewline & _
+                     "No = Import only SELECTED files", _
+                     vbyesnocancel + vbquestion, "Recompose - Choose Import Mode")
 
-addNote "starting Access..."
-Dim oApplication
-Set oApplication = CreateObject("Access.Application")
-addNote "opening " & importTo & " ..."
-oApplication.OpenCurrentDatabase importTo
-oApplication.runCommand acCmdCloseAll
-oApplication.CurrentDb.Properties("AllowByPassKey") = True
+if importmode = vbcancel then
+    addnote "Recompose cancelled"
+    fso.deletefile importto
+    set fso = nothing
+    exit function
+end if
 
-Dim folder
-Dim myFile, objectname, objecttype
+' build a collection of file paths to import
+dim db as database
+set db = currentdb()
 
-'forms
-Set folder = fso.getfolder(repo & "\Forms\")
+dim rs as recordset
+if importmode = vbyes then
+    set rs = db.openrecordset("SELECT location FROM tblFiles WHERE Nz(fileStatus,'') <> ''")
+else
+    set rs = db.openrecordset("SELECT location FROM tblFiles WHERE selected = True")
+end if
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+if rs.eof then
+    addnote "No files to import"
+    rs.close: set rs = nothing: set db = nothing
+    fso.deletefile importto
+    set fso = nothing
+    exit function
+end if
 
-    If objecttype = "form" Then
-        oApplication.LoadFromText acForm, objectname, myFile.Path
-        addNote objectname & " LOADED"
-    End If
-Next
+' collect file paths into a dictionary for quick lookup
+dim filestoimport as object
+set filestoimport = createobject("Scripting.Dictionary")
+do while not rs.eof
+    filestoimport.add trim(rs!location), true
+    rs.movenext
+loop
+rs.close: set rs = nothing: set db = nothing
 
-'subforms
-Set folder = fso.getfolder(repo & "\Forms\SubForms\")
+' open the temp database
+addnote "Starting Access..."
+dim oapplication as object
+set oapplication = createobject("Access.Application")
+addnote "Opening " & importto & " ..."
+oapplication.opencurrentdatabase importto
+oapplication.runcommand accmdcloseall
+oapplication.currentdb.properties("AllowByPassKey") = true
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+dim folder as object, myfile as object
+dim objectname as string, objecttype as string, relativepath as string
 
-    If objecttype = "form" Then
-        oApplication.LoadFromText acForm, objectname, myFile.Path
-        addNote objectname & " LOADED"
-    End If
-Next
+' --- forms ---
+if fso.folderexists(repo & "Forms\") then
+    set folder = fso.getfolder(repo & "Forms\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Forms/" & myfile.name
+        if objecttype = "form" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading form: " & objectname
+            oapplication.loadfromtext acform, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-'macros
-Set folder = fso.getfolder(repo & "\Macros\")
+' --- subforms ---
+if fso.folderexists(repo & "Forms\SubForms\") then
+    set folder = fso.getfolder(repo & "Forms\SubForms\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Forms/SubForms/" & myfile.name
+        if objecttype = "form" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading subform: " & objectname
+            oapplication.loadfromtext acform, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+' --- modules ---
+if fso.folderexists(repo & "Modules\") then
+    set folder = fso.getfolder(repo & "Modules\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Modules/" & myfile.name
+        if objecttype = "bas" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading module: " & objectname
+            oapplication.loadfromtext acmodule, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-    oApplication.LoadFromText acMacro, objectname, myFile.Path
-    addNote objectname & " LOADED"
-Next
+' --- macros ---
+if fso.folderexists(repo & "Macros\") then
+    set folder = fso.getfolder(repo & "Macros\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Macros/" & myfile.name
+        if objecttype = "mod" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading macro: " & objectname
+            oapplication.loadfromtext acmacro, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-'modules
-Set folder = fso.getfolder(repo & "\Modules\")
+' --- queries ---
+if fso.folderexists(repo & "Queries\") then
+    set folder = fso.getfolder(repo & "Queries\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Queries/" & myfile.name
+        if objecttype = "sql" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading query: " & objectname
+            importqueryfromsql oapplication, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+' --- subqueries ---
+if fso.folderexists(repo & "Queries\SubQueries\") then
+    set folder = fso.getfolder(repo & "Queries\SubQueries\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Queries/SubQueries/" & myfile.name
+        if objecttype = "sql" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading subquery: " & objectname
+            importqueryfromsql oapplication, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-    oApplication.LoadFromText acModule, objectname, myFile.Path
-    addNote objectname & " LOADED"
-Next
+' --- reports ---
+if fso.folderexists(repo & "Reports\") then
+    set folder = fso.getfolder(repo & "Reports\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Reports/" & myfile.name
+        if objecttype = "rpt" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading report: " & objectname
+            oapplication.loadfromtext acreport, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-'queries
-Set folder = fso.getfolder(repo & "\Queries\")
+' --- subreports ---
+if fso.folderexists(repo & "Reports\SubReports\") then
+    set folder = fso.getfolder(repo & "Reports\SubReports\")
+    for each myfile in folder.files
+        objecttype = fso.getextensionname(myfile.name)
+        objectname = fso.getbasename(myfile.name)
+        relativepath = "Reports/SubReports/" & myfile.name
+        if objecttype = "rpt" and shouldimport(filestoimport, relativepath, importmode) then
+            addnote "Loading subreport: " & objectname
+            oapplication.loadfromtext acreport, objectname, myfile.path
+            addnote objectname & " LOADED"
+        end if
+    next
+end if
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+' compile and close
+oapplication.runcommand accmdcompileandsaveallmodules
+oapplication.closecurrentdatabase
+oapplication.quit
+set oapplication = nothing
+
+' replace original with recomposed version
+addnote "Replacing original with recomposed file..."
+fso.deletefile dbsource
+fso.copyfile importto, dbsource
+fso.deletefile importto
+
+set filestoimport = nothing
+set fso = nothing
+
+addnote "Recompose Complete"
+
+end function
+
+function shouldimport(filestoimport as object, relativepath as string, importmode as integer) as boolean
+    ' in "all modified" or "selected" mode, check if this file is in the list
+    ' normalize slashes for comparison since git uses forward slashes
+    dim normalized as string
+    normalized = replace(relativepath, "\", "/")
     
-'    On Error Resume Next
-'    oApplication.CurrentDb.QueryDefs.Delete objectname
-'    On Error GoTo 0
-'
-'    oApplication.CurrentDb.CreateQueryDef objectname, fso.openTextFile(myFile.Path, 1).ReadAll
-    If objecttype = "qry" Then
-        oApplication.LoadFromText acQuery, objectname, myFile.Path
-        addNote objectname & " LOADED"
-    End If
-Next
-
-'subqueries
-Set folder = fso.getfolder(repo & "\Queries\SubQueries\")
-
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+    dim key as variant
+    for each key in filestoimport.keys
+        if instr(1, replace(trim(key), "\", "/"), normalized, vbtextcompare) > 0 then
+            shouldimport = true
+            exit function
+        end if
+    next key
     
-    oApplication.LoadFromText acQuery, objectname, myFile.Path
-    addNote objectname & " LOADED"
-Next
+    shouldimport = false
+end function
 
-'reports
-Set folder = fso.getfolder(repo & "\Reports\")
+function decomposeaccdb(sadpfilename as string, sexportpath as string)
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+dim fso as object
+set fso = createobject("Scripting.FileSystemObject")
 
-    oApplication.LoadFromText acReport, objectname, myFile.Path
-    addNote objectname & " LOADED"
-Next
+dim mytype as string, myname as string
+mytype = fso.getextensionname(sadpfilename)
+myname = fso.getbasename(sadpfilename)
 
-'subreports
-Set folder = fso.getfolder(repo & "\Reports\SubReports\")
+' copy to a stub file so we don't modify the original
+dim sstubadpfilename as string
+sstubadpfilename = environ("temp") & "\" & myname & "_stub." & mytype
+addnote "Copying stub to " & sstubadpfilename & "..."
+fso.copyfile sadpfilename, sstubadpfilename
 
-For Each myFile In folder.Files
-    objecttype = fso.GetExtensionName(myFile.Name)
-    objectname = fso.GetBaseName(myFile.Name)
-    addNote "Loading " & objectname & " (" & objecttype & ")"
+' enable shift bypass via dbengine then open in the same instance
+addnote "Starting Access..."
+dim oapplication as object
+set oapplication = createobject("Access.Application")
 
-    oApplication.LoadFromText acReport, objectname, myFile.Path
-    addNote objectname & " LOADED"
-Next
+' set bypass via raw db access first (no startup code runs)
+addnote "Enabling shift bypass..."
+dim dbbypass as object
+set dbbypass = oapplication.dbengine.opendatabase(sstubadpfilename, false, false)
+dbbypass.properties("AllowByPassKey") = true
+dbbypass.close
+set dbbypass = nothing
 
-oApplication.runCommand acCmdCompileAndSaveAllModules
-oApplication.CloseCurrentDatabase
-oApplication.Quit
+' now open with full access in the same instance — bypass is already active
+oapplication.opencurrentdatabase sstubadpfilename
+oapplication.visible = false
 
-addNote "Files Imported"
+addnote "Clearing old export files..."
+' clear all export folders in one pass
+dim exportfolders as variant
+exportfolders = array("Forms\", "Forms\SubForms\", "Modules\", "Macros\", _
+                      "Reports\", "Reports\SubReports\", "Queries\", _
+                      "Queries\SubQueries\", "Tables\", "VBproject\")
 
-End Function
+dim i as long
+for i = lbound(exportfolders) to ubound(exportfolders)
+    clearfolder fso, sexportpath & "\" & exportfolders(i)
+next i
 
-Function decomposeAccdb(sADPFilename As String, sExportPath As String)
+' ensure all output folders exist
+for i = lbound(exportfolders) to ubound(exportfolders)
+    ensurefolder fso, sexportpath & "\" & exportfolders(i)
+next i
 
-Dim fso As Object
-Set fso = CreateObject("Scripting.FileSystemObject")
+addnote "Exporting..."
+dim myobj as object
 
-Dim myType, myName, myPath, sStubADPFilename As String
-myType = fso.GetExtensionName(sADPFilename)
-myName = fso.GetBaseName(sADPFilename)
-myPath = fso.getparentfoldername(sADPFilename)
+' --- forms ---
+for each myobj in oapplication.currentproject.allforms
+    addnote "  exporting form: " & myobj.fullname, batch:=true
+    if left(myobj.fullname, 1) = "s" then
+        oapplication.saveastext acform, myobj.fullname, sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form"
+        normalizeexportfile sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form"
+        splitformfile (sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form")
+    else
+        oapplication.saveastext acform, myobj.fullname, sexportpath & "\Forms\" & myobj.fullname & ".form"
+        normalizeexportfile sexportpath & "\Forms\" & myobj.fullname & ".form"
+        splitformfile (sexportpath & "\Forms\" & myobj.fullname & ".form")
+    end if
+next
+flushnotes
 
-sStubADPFilename = Environ("temp") & "\" & myName & "_stub." & myType
-addNote sStubADPFilename
-addNote "copy stub to " & sStubADPFilename & "..."
-fso.CopyFile sADPFilename, sStubADPFilename
+' --- modules ---
+for each myobj in oapplication.currentproject.allmodules
+    addnote "  exporting module: " & myobj.fullname, batch:=true
+    oapplication.saveastext acmodule, myobj.fullname, sexportpath & "\Modules\" & myobj.fullname & ".bas"
+    normalizeexportfile sexportpath & "\Modules\" & myobj.fullname & ".bas"
+next
+flushnotes
 
-addNote "starting Access..."
+' --- macros ---
+for each myobj in oapplication.currentproject.allmacros
+    addnote "  exporting macro: " & myobj.fullname, batch:=true
+    oapplication.saveastext acmacro, myobj.fullname, sexportpath & "\Macros\" & myobj.fullname & ".mod"
+    normalizeexportfile sexportpath & "\Macros\" & myobj.fullname & ".mod"
+next
+flushnotes
 
-Dim dbT, accT
-Set accT = CreateObject("Access.Application")
-Set dbT = accT.dbEngine.OpenDatabase(sStubADPFilename, False, False)
+' --- reports ---
+for each myobj in oapplication.currentproject.allreports
+    addnote "  exporting report: " & myobj.fullname, batch:=true
+    if left(myobj.fullname, 1) = "s" then
+        oapplication.saveastext acreport, myobj.fullname, sexportpath & "\Reports\SubReports\" & myobj.fullname & ".rpt"
+        normalizeexportfile sexportpath & "\Reports\SubReports\" & myobj.fullname & ".rpt"
+    else
+        oapplication.saveastext acreport, myobj.fullname, sexportpath & "\Reports\" & myobj.fullname & ".rpt"
+        normalizeexportfile sexportpath & "\Reports\" & myobj.fullname & ".rpt"
+    end if
+next
+flushnotes
 
-dbT.Properties("AllowByPassKey") = True
-dbT.Close
-Set dbT = Nothing
-accT.Quit
-Set accT = Nothing
+' --- queries ---
+' write .sql files for all queries (fast, good for diffs).
+' also write .qry via saveastext for passthrough queries only (createquerydef can't handle them).
+for each myobj in oapplication.currentdb.querydefs
+    if left(myobj.name, 3) = "~sq" then goto nextquery  ' skip form-embedded queries
+    addnote "  exporting query: " & myobj.name, batch:=true
+    if left(myobj.name, 1) = "s" then
+        writetotextfile sexportpath & "\Queries\SubQueries\" & myobj.name & ".sql", myobj.sql
+        if myobj.type = dbqsqlpassthrough then
+            oapplication.saveastext acquery, myobj.name, sexportpath & "\Queries\SubQueries\" & myobj.name & ".qry"
+        end if
+    else
+        writetotextfile sexportpath & "\Queries\" & myobj.name & ".sql", myobj.sql
+        if myobj.type = dbqsqlpassthrough then
+            oapplication.saveastext acquery, myobj.name, sexportpath & "\Queries\" & myobj.name & ".qry"
+        end if
+    end if
+nextquery:
+next
+flushnotes
 
-Dim oApplication
-Set oApplication = CreateObject("Access.Application")
-addNote "opening " & sStubADPFilename & " ..."
-oApplication.OpenCurrentDatabase sStubADPFilename
-oApplication.Visible = False
+' --- vb project information ---
+addnote "  exporting vbproject information", batch:=true
+dim dictsubvalues as object, dictbody as object
+set dictsubvalues = createobject("Scripting.Dictionary")
+set dictbody = createobject("Scripting.Dictionary")
 
-addNote "exporting..."
-Dim myObj
-Dim delFold
-Dim delFile
+for each myobj in oapplication.vbe.activevbproject.references
+    addnote "  " & myobj.name & " " & myobj.major & "." & myobj.minor, batch:=true
+    dictsubvalues.add myobj.name & " " & myobj.major & "." & myobj.minor, myobj.fullpath
+next
 
-'delete all files
-addNote "  --Clearing Forms Tracking Files---"
-If fso.FolderExists(sExportPath & "\Forms\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Forms\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+dictbody.add "project-name", oapplication.vbe.activevbproject.name
+dictbody.add "vb-references", dictsubvalues
+writetotextfile sexportpath & "\VBproject\VBproject-properties.json", tojson(dictbody)
+flushnotes
 
-addNote "  --Clearing SubForms Tracking Files---"
-If fso.FolderExists(sExportPath & "\Forms\SubForms\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Forms\SubForms\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+' cleanup
+set myobj = nothing
+oapplication.closecurrentdatabase
+oapplication.quit
+set oapplication = nothing
+doevents
 
-addNote "  --Clearing Modules Tracking Files---"
-If fso.FolderExists(sExportPath & "\Modules\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Modules\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+' wait for access to fully release the file lock before deleting
+dim retries as long
+for retries = 1 to 10
+    if fso.fileexists(sstubadpfilename) then
+        on error resume next
+        fso.deletefile sstubadpfilename
+        if err.number = 0 then
+            on error goto 0
+            exit for
+        end if
+        on error goto 0
+    end if
+    doevents
+    sleep 500  ' wait 500ms between retries
+next retries
 
-addNote "  --Clearing Macros Tracking Files---"
-If fso.FolderExists(sExportPath & "\Macros\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Macros\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+set fso = nothing
 
-addNote "  --Clearing Reports Tracking Files---"
-If fso.FolderExists(sExportPath & "\Reports\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Reports\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+flushnotes
+addnote "++ Files Decomposed from " & sadpfilename
 
-addNote "  --Clearing SubReports Tracking Files---"
-If fso.FolderExists(sExportPath & "\Reports\SubReports\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Reports\SubReports\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+end function
 
-addNote "  --Clearing Queries Tracking Files---"
-If fso.FolderExists(sExportPath & "\Queries\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Queries\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+private sub clearfolder(fso as object, folderpath as string)
+    if not fso.folderexists(folderpath) then exit sub
+    dim f as object
+    for each f in fso.getfolder(folderpath).files
+        fso.deletefile f.path, true
+    next
+end sub
 
-addNote "  --Clearing SubQueries Tracking Files---"
-If fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Queries\SubQueries\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+private sub ensurefolder(fso as object, folderpath as string)
+    if fso.folderexists(folderpath) then exit sub
+    ' create parent first if needed
+    dim parent as string
+    parent = fso.getparentfoldername(folderpath)
+    if not fso.folderexists(parent) then mkdir parent
+    mkdir folderpath
+end sub
 
-addNote "  --Clearing Tables Tracking Files---"
-If fso.FolderExists(sExportPath & "\Tables\") Then
-    Set delFold = fso.getfolder(sExportPath & "\Tables\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+function writetotextfile(filelocation as string, texttowrite as string)
 
-addNote "  --Clearing VBProject Tracking Files---"
-If fso.FolderExists(sExportPath & "\VBProject\") Then
-    Set delFold = fso.getfolder(sExportPath & "\VBProject\")
-    For Each delFile In delFold.Files
-        fso.DeleteFile delFile.Path, True ' True for force deletion
-    Next
-End If
+dim filenum as integer
+filenum = freefile()
 
-Set delFile = Nothing
-Set delFold = Nothing
+open filelocation for output as #filenum
+print #filenum, texttowrite
+close #filenum
 
-'---FORMS---
-For Each myObj In oApplication.CurrentProject.AllForms
-    If Not fso.FolderExists(sExportPath & "\Forms\") Then MkDir (sExportPath & "\Forms\")
-    addNote "  exporting form: " & myObj.FullName
-    'move all new files
-    If Left(myObj.FullName, 1) = "s" Then
-        If Not fso.FolderExists(sExportPath & "\Forms\SubForms\") Then MkDir (sExportPath & "\Forms\SubForms\")
-        oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\SubForms\" & myObj.FullName & ".form"
-        splitFormFile (sExportPath & "\Forms\SubForms\" & myObj.FullName & ".form")
-    Else
-        oApplication.SaveAsText acForm, myObj.FullName, sExportPath & "\Forms\" & myObj.FullName & ".form"
-        splitFormFile (sExportPath & "\Forms\" & myObj.FullName & ".form")
-    End If
-Next
+end function
 
-'---MODULES---
-For Each myObj In oApplication.CurrentProject.AllModules
-    If Not fso.FolderExists(sExportPath & "\Modules\") Then MkDir (sExportPath & "\Modules\")
-    addNote "  exporting module: " & myObj.FullName
-    oApplication.SaveAsText acModule, myObj.FullName, sExportPath & "\Modules\" & myObj.FullName & ".bas"
-Next
-
-For Each myObj In oApplication.CurrentProject.AllMacros
-    If Not fso.FolderExists(sExportPath & "\Macros\") Then MkDir (sExportPath & "\Macros\")
-    addNote "  exporting macro: " & myObj.FullName
-    oApplication.SaveAsText acMacro, myObj.FullName, sExportPath & "\Macros\" & myObj.FullName & ".mod"
-Next
-
-'---REPORTS---
-For Each myObj In oApplication.CurrentProject.AllReports
-    If Not fso.FolderExists(sExportPath & "\Reports\") Then MkDir (sExportPath & "\Reports\")
-    addNote "  exporting report: " & myObj.FullName
-    If Left(myObj.FullName, 1) = "s" Then
-        If Not fso.FolderExists(sExportPath & "\Reports\SubReports\") Then MkDir (sExportPath & "\Reports\SubReports\")
-        oApplication.SaveAsText acReport, myObj.FullName, sExportPath & "\Reports\SubReports\" & myObj.FullName & ".rpt"
-    Else
-        oApplication.SaveAsText acReport, myObj.FullName, sExportPath & "\Reports\" & myObj.FullName & ".rpt"
-    End If
-Next
-
-'---QUERIES---
-For Each myObj In oApplication.CurrentDb.QueryDefs
-    If Not Left(myObj.Name, 3) = "~sq" Then 'exclude queries defined by the forms. Already included in the form itself
-        If Not fso.FolderExists(sExportPath & "\Queries\") Then MkDir (sExportPath & "\Queries\")
-        addNote "  exporting query: " & myObj.Name
-        If Left(myObj.Name, 1) = "s" Then
-            If Not fso.FolderExists(sExportPath & "\Queries\SubQueries\") Then MkDir (sExportPath & "\Queries\SubQueries\")
-            Call writeToTextFile(sExportPath & "\Queries\SubQueries\" & myObj.Name & ".sql", myObj.SQL)
-            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\SubQueries\" & myObj.Name & ".qry"
-        Else
-            Call writeToTextFile(sExportPath & "\Queries\" & myObj.Name & ".sql", myObj.SQL)
-            oApplication.SaveAsText acQuery, myObj.Name, sExportPath & "\Queries\" & myObj.Name & ".qry"
-        End If
-    End If
-Next
-
-'---TABLES---
-'For Each myObj In oApplication.CurrentDb.TableDefs
-'    If Not fso.FolderExists(sExportPath & "\Tables\") Then MkDir (sExportPath & "\Tables\")
-'
-'    If myObj.Connect = "" Then 'for local tables only, include data
-'        addNote "  exporting table definition: " & myObj.Name
-'        oApplication.ExportXML acTable, myObj.Name, sExportPath & "\Tables\" & myObj.Name & "_rows.xml", sExportPath & "\Tables\" & myObj.Name & "_def.xml", , , , acExportAllTableAndFieldProperties
-'    End If
-'Next
-
-'---VB PROJECT INFORMATION---
-Dim body As String, dictSubValues As Object, dictBody As Object
-Set dictSubValues = CreateObject("Scripting.Dictionary")
-Set dictBody = CreateObject("Scripting.Dictionary")
-
-addNote "  exporting vbproject information"
-
-For Each myObj In oApplication.VBE.ActiveVBProject.References
-    If Not fso.FolderExists(sExportPath & "\VBproject\") Then MkDir (sExportPath & "\VBproject\")
-    addNote "  " & myObj.Name & myObj.major & "." & myObj.minor
-    dictSubValues.Add myObj.Name & " " & myObj.major & "." & myObj.minor, myObj.FullPath
-Next
-
-dictBody.Add "project-name", oApplication.VBE.ActiveVBProject.Name
-dictBody.Add "vb-references", dictSubValues
-
-Call writeToTextFile(sExportPath & "\VBproject\VBproject-properties.json", ToJson(dictBody))
-
-'---DB FILE PROPERTIES---
-Dim dbtestthis
-Set dbtestthis = oApplication.CurrentDb
-
-Set myObj = Nothing
-oApplication.CloseCurrentDatabase
-oApplication.Quit
-Set oApplication = Nothing
-Set fso = Nothing
-
-addNote "++ Files Decomposed from " & sADPFilename
-
-End Function
-
-Function writeToTextFile(fileLocation As String, textToWrite As String)
-
-Dim FileNum As Integer
-
-Open fileLocation For Output As #1 ' Open the file for output
-Print #1, textToWrite
-
-Close #1
-
-End Function
-
-Function splitFormFile(fileLocation)
-
-Dim FileNum As Integer
-Dim DataLine As String
-Dim codeLine As Boolean
-codeLine = False
-
-Dim myFile As String
-myFile = Replace(fileLocation, ".form", ".bas")
-Open myFile For Output As #2 ' Open the file for output
-
-FileNum = FreeFile()
-Open fileLocation For Input As #1
-
-While Not EOF(FileNum)
-    Line Input #1, DataLine ' read in data 1 line at a time
+sub importqueryfromsql(oapp as object, queryname as string, sqlfilepath as string)
+    ' check if a .qry file exists alongside the .sql — if so, it's a passthrough query
+    ' and we need loadfromtext to preserve connect/returnsrecords properties
+    dim qryfilepath as string
+    qryfilepath = replace(sqlfilepath, ".sql", ".qry")
     
-    If codeLine Then
-        Print #2, DataLine
-    End If
+    dim fso as object
+    set fso = createobject("Scripting.FileSystemObject")
     
-    If DataLine = "CodeBehindForm" Then codeLine = True
+    if fso.fileexists(qryfilepath) then
+        ' passthrough — use loadfromtext which preserves all query properties
+        oapp.loadfromtext acquery, queryname, qryfilepath
+    else
+        ' standard query — createquerydef from raw sql is much faster
+        dim filenum as integer, sqltext as string
+        filenum = freefile()
+        open sqlfilepath for input as #filenum
+        sqltext = input$(lof(filenum), filenum)
+        close #filenum
+        
+        on error resume next
+        oapp.currentdb.querydefs.delete queryname
+        on error goto 0
+        
+        oapp.currentdb.createquerydef queryname, sqltext
+    end if
     
-Wend
+    set fso = nothing
+end sub
 
-Close #1
-Close #2
+function splitformfile(filelocation)
 
-End Function
+dim dataline as string
+dim codeline as boolean
+codeline = false
 
-Function addNote(noteTxt As String)
+dim myfile as string
+myfile = replace(filelocation, ".form", ".bas")
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "INSERT INTO tblReleaseTracking(task) VALUES('" & StrQuoteReplace(noteTxt) & " ')"
-DoCmd.SetWarnings True
+dim fnout as integer, fnin as integer
+fnout = freefile()
+open myfile for output as #fnout
 
-On Error Resume Next
-Form_sfrmTracking.Requery
+fnin = freefile()
+open filelocation for input as #fnin
 
-moveTrackingToLastRecord
+while not eof(fnin)
+    line input #fnin, dataline
+    
+    if codeline then
+        print #fnout, dataline
+    end if
+    
+    if dataline = "CodeBehindForm" then codeline = true
+wend
 
-DoEvents
+close #fnin
+close #fnout
 
-End Function
+end function
+
+sub normalizeexportfile(filepath as string)
+    ' normalize casing in saveastext output to prevent false diffs.
+    ' access randomly changes identifier casing between exports.
+    ' this lowercases everything except content inside double quotes,
+    ' preserving user-visible strings like msgbox text.
+    
+    dim fnin as integer, fnout as integer
+    dim tmppath as string, dataline as string
+    
+    tmppath = filepath & ".tmp"
+    
+    fnin = freefile()
+    open filepath for input as #fnin
+    fnout = freefile()
+    open tmppath for output as #fnout
+    
+    while not eof(fnin)
+        line input #fnin, dataline
+        dataline = lcasepreservestrings(dataline)
+        print #fnout, dataline
+    wend
+    
+    close #fnin
+    close #fnout
+    
+    kill filepath
+    name tmppath as filepath
+    
+end sub
+
+function lcasepreservestrings(byval s as string) as string
+    ' lowercases everything outside of double-quoted strings.
+    ' "Hello World" stays as-is, but dim myvar becomes dim myvar.
+    dim result as string, i as long, inquote as boolean, ch as string
+    
+    result = ""
+    inquote = false
+    
+    for i = 1 to len(s)
+        ch = mid$(s, i, 1)
+        if ch = """" then
+            inquote = not inquote
+            result = result & ch
+        elseif inquote then
+            result = result & ch  ' preserve original case inside quotes
+        else
+            result = result & lcase$(ch)
+        end if
+    next i
+    
+    lcasepreservestrings = result
+end function
+
+function addnote(notetxt as string, optional batch as boolean = false)
+
+currentdb.execute "INSERT INTO tblReleaseTracking(task) VALUES('" & strquotereplace(notetxt) & " ')", dbfailonerror
+
+' in batch mode, skip the expensive requery/scroll — caller will flush at the end
+if batch then exit function
+
+on error resume next
+form_sfrmtracking.requery
+movetrackingtolastrecord
+
+doevents
+
+end function
+
+sub flushnotes()
+' call after a batch of addnote calls to update the tracking display once
+    on error resume next
+    form_sfrmtracking.requery
+    movetrackingtolastrecord
+    doevents
+end sub

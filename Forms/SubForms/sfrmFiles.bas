@@ -1,52 +1,60 @@
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = True
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = False
-Option Compare Database
-Option Explicit
+attribute vb_globalnamespace = false
+attribute vb_creatable = true
+attribute vb_predeclaredid = true
+attribute vb_exposed = false
+option compare database
+option explicit
 
-Private Sub location_Click()
+private sub location_click()
 
-Dim gitCmd As String
+dim gitcmd as string
 
-If Me.fileStatus = "staged" Then
-    gitCmd = "git diff --cached "
-Else
-    gitCmd = "git diff "
-End If
+if me.filestatus = "staged" then
+    gitcmd = "git diff --cached "
+else
+    gitcmd = "git diff "
+end if
 
-addNote gitCmd & Me.location
+addnote gitcmd & me.location
 
 'add all modified files
-Dim results As String
-results = runGitCmd(gitCmd & Trim(Me.location), printNone:=True)
+dim results as string
+results = rungitcmd(gitcmd & trim(me.location), printnone:=true)
 
-DoCmd.SetWarnings False
-DoCmd.RunSQL "DELETE * from tblDiff"
-DoCmd.SetWarnings True
+dim dbdiff as database
+set dbdiff = currentdb()
+dbdiff.execute "DELETE * FROM tblDiff", dbfailonerror
 
-Dim arr() As String
-arr = Split(results, vbLf)
-DoCmd.SetWarnings False
-Dim ITEM
-For Each ITEM In arr
-        DoCmd.RunSQL "INSERT INTO tblDiff(diffLine) VALUES('" & StrQuoteReplace(ITEM) & "')"
-Next ITEM
-DoCmd.SetWarnings True
+dim arr() as string
+arr = split(results, vblf)
 
-Form__MAIN.lblGitDiff.Caption = "Git Diff " & Me.location
-Form__MAIN.sfrmDiff.Requery
-End Sub
+dim item
+dim rsdiff as dao.recordset
+set rsdiff = dbdiff.openrecordset("tblDiff", dbopendynaset, dbappendonly)
 
-Private Sub stage_Click()
+for each item in arr
+    rsdiff.addnew
+    rsdiff!diffline = item
+    rsdiff.update
+next item
 
-If Me.fileStatus <> "staged" Then
-    Call runGitCmd("git add " & Me.location)
-    Call Form__MAIN.gitStatus_Click
-Else
-    Call runGitCmd("git reset " & Me.location)
-    Call Form__MAIN.gitStatus_Click
-End If
+rsdiff.close
+set rsdiff = nothing
+set dbdiff = nothing
+
+form__main.lblgitdiff.caption = "Git Diff " & me.location
+form__main.sfrmdiff.requery
+end sub
+
+private sub stage_click()
+
+if me.filestatus <> "staged" then
+    call rungitcmd("git add " & me.location)
+    call form__main.gitstatus_click
+else
+    call rungitcmd("git reset " & me.location)
+    call form__main.gitstatus_click
+end if
 
 
-End Sub
+end sub

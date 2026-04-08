@@ -1,67 +1,67 @@
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = True
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = False
-Option Compare Database
-Option Explicit
+attribute vb_globalnamespace = false
+attribute vb_creatable = true
+attribute vb_predeclaredid = true
+attribute vb_exposed = false
+option compare database
+option explicit
 
-Private Sub Form_Load()
+private sub form_load()
 
-TempVars.Add "loadAmount", 0
-TempVars.Add "loadWd", 8160
+tempvars.add "loadAmount", 0
+tempvars.add "loadWd", 8160
 
-Me.lblFrozen.Visible = False
-Call setSplashLoading("Loading.")
+me.lblfrozen.visible = false
+call setsplashloading("Loading.")
 
-DoEvents
-Form_frmSplash.SetFocus
-DoEvents
+doevents
+form_frmsplash.setfocus
+doevents
 
-Call setSplashLoading("Loading..")
+call setsplashloading("Loading..")
 
-If CommandBars("Ribbon").Height > 100 Then CommandBars.ExecuteMso "MinimizeRibbon"
+if commandbars("Ribbon").height > 100 then commandbars.executemso "MinimizeRibbon"
 
-Call setSplashLoading("Loading...")
+call setsplashloading("Loading...")
 
 'set up theme
-Dim themeId As Long
-themeId = Nz(DLookup("themeId", "tblParameters"), 0)
+dim themeid as long
+themeid = nz(dlookup("themeId", "tblParameters"), 0)
 
-Dim db As Database
-Set db = CurrentDb()
+dim db as database
+set db = currentdb()
 
-Dim rsTheme As Recordset
+dim rstheme as recordset
 
-If themeId <> 0 Then
-    Set rsTheme = db.OpenRecordset("SELECT * FROM tblTheme WHERE recordId = " & themeId)
+if themeid <> 0 then
+    set rstheme = db.openrecordset("SELECT * FROM tblTheme WHERE recordId = " & themeid)
     
-    If rsTheme!darkMode.value Then
-        TempVars.Add "themeMode", "Dark"
-    Else
-        TempVars.Add "themeMode", "Light"
-    End If
+    if rstheme!darkmode.value then
+        tempvars.add "themeMode", "Dark"
+    else
+        tempvars.add "themeMode", "Light"
+    end if
     
-    TempVars.Add "themePrimary", CStr(rsTheme!primaryColor.value)
-    TempVars.Add "themeSecondary", CStr(rsTheme!secondaryColor.value)
-    TempVars.Add "themeAccent", CStr(rsTheme!accentColor.value)
-    TempVars.Add "themeColorLevels", CStr(rsTheme!colorLevels.value)
+    tempvars.add "themePrimary", cstr(rstheme!primarycolor.value)
+    tempvars.add "themeSecondary", cstr(rstheme!secondarycolor.value)
+    tempvars.add "themeAccent", cstr(rstheme!accentcolor.value)
+    tempvars.add "themeColorLevels", cstr(rstheme!colorlevels.value)
     
-    rsTheme.Close
-    Set rsTheme = Nothing
-End If
+    rstheme.close
+    set rstheme = nothing
+end if
 
-Set db = Nothing
+set db = nothing
 
-Call setSplashLoading("Loading....")
+call setsplashloading("Loading....")
 
-DoCmd.OpenForm "_MAIN"
-Form__MAIN.Visible = False
+docmd.openform "_MAIN"
+form__main.visible = false
 
-Call setSplashLoading("Loading.....")
+call setsplashloading("Loading.....")
 
-DoCmd.Close acForm, "frmSplash"
-DoEvents
-Form__MAIN.Visible = True
-DoCmd.Maximize
+docmd.close acform, "frmSplash"
+doevents
+form__main.visible = true
+docmd.maximize
     
-End Sub
+end sub

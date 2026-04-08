@@ -1,59 +1,59 @@
-Option Compare Database
-Option Explicit
+option compare database
+option explicit
 
-Function setSplashLoading(label As String)
+function setsplashloading(label as string)
 
-If IsNull(TempVars!loadAmount) Then Exit Function
-TempVars.Add "loadAmount", TempVars!loadAmount + 1
-Form_frmSplash.lnLoading.Width = (TempVars!loadAmount / 5) * TempVars!loadWd
-Form_frmSplash.lblLoading.Caption = label
-Form_frmSplash.Repaint
+if isnull(tempvars!loadamount) then exit function
+tempvars.add "loadAmount", tempvars!loadamount + 1
+form_frmsplash.lnloading.width = (tempvars!loadamount / 5) * tempvars!loadwd
+form_frmsplash.lblloading.caption = label
+form_frmsplash.repaint
 
-End Function
+end function
 
-Function assignThemeToParameters(themeId As Long)
+function assignthemetoparameters(themeid as long)
 
-Dim db As Database
-Set db = CurrentDb
+dim db as database
+set db = currentdb
 
-db.Execute "UPDATE tblParameters SET themeId = " & themeId
+db.execute "UPDATE tblParameters SET themeId = " & themeid
 
-Set db = Nothing
+set db = nothing
 
-End Function
+end function
 
-Function disableShift()
+function disableshift()
 
-Dim db, acc
-Set acc = CreateObject("Access.Application")
-'Set db = acc.DBEngine.OpenDatabase("\\data\mdbdata\WorkingDB\build\Commands\Misc_Commands\WorkingDB_SummaryEmail.accdb", False, False)
-'Set db = acc.DBEngine.OpenDatabase("H:\dev\WorkingDB_SummaryEmail.accdb", False, False)
-Set db = acc.dbEngine.OpenDatabase("C:\workingdb\WorkingDB_ghost.accdb", False, False)
+dim db, acc
+set acc = createobject("Access.Application")
+'set db = acc.dbengine.opendatabase("\\data\mdbdata\WorkingDB\build\Commands\Misc_Commands\WorkingDB_SummaryEmail.accdb", false, false)
+'set db = acc.dbengine.opendatabase("H:\dev\WorkingDB_SummaryEmail.accdb", false, false)
+set db = acc.dbengine.opendatabase("C:\workingdb\WorkingDB_ghost.accdb", false, false)
 
 
-db.Properties("AllowByPassKey") = True
+db.properties("AllowByPassKey") = true
 
-db.Close
-Set db = Nothing
+db.close
+set db = nothing
 
-End Function
+end function
 
-Function getPassword()
+function getpassword()
 
-Dim db As Database
-Set db = OpenDatabase("")
+dim db as database
+set db = opendatabase("")
 
-Dim rs As Recordset
-Set rs = db.OpenRecordset("SELECT * FROM MSysObjects WHERE Connect is not null")
+dim rs as recordset
+set rs = db.openrecordset("SELECT * FROM MSysObjects WHERE Connect is not null")
 
-Do While Not rs.EOF
-    Debug.Print "Database: " & rs!Database & vbTab & " Connection: " & rs!Connect
-    rs.MoveNext
-Loop
+do while not rs.eof
+    debug.print "Database: " & rs!database & vbtab & " Connection: " & rs!connect
+    rs.movenext
+loop
 
-rs.Close
-Set rs = Nothing
-db.Close
-Set db = Nothing
+rs.close
+set rs = nothing
+db.close
+set db = nothing
 
-End Function
+end function
