@@ -280,7 +280,7 @@ set fso = nothing
 
 ' log any errors from stderr
 if len(strerror) > 0 then
-    addnote "GIT ERROR: " & strerror
+    addnote strerror
 end if
 
 dim arr() as string
@@ -623,55 +623,53 @@ addnote "Exporting..."
 dim myobj as object
 
 ' --- forms ---
+addnote "       exporting forms"
 for each myobj in oapplication.currentproject.allforms
-    addnote "  exporting form: " & myobj.fullname, batch:=true
     if left(myobj.fullname, 1) = "s" then
         oapplication.saveastext acform, myobj.fullname, sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form"
-        normalizeexportfile sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form"
         splitformfile (sexportpath & "\Forms\SubForms\" & myobj.fullname & ".form")
+        normalizeexportfile sexportpath & "\Forms\SubForms\" & myobj.fullname & ".bas"
     else
         oapplication.saveastext acform, myobj.fullname, sexportpath & "\Forms\" & myobj.fullname & ".form"
-        normalizeexportfile sexportpath & "\Forms\" & myobj.fullname & ".form"
         splitformfile (sexportpath & "\Forms\" & myobj.fullname & ".form")
+        normalizeexportfile sexportpath & "\Forms\" & myobj.fullname & ".bas"
     end if
 next
-flushnotes
 
 ' --- modules ---
+addnote "       exporting modules"
 for each myobj in oapplication.currentproject.allmodules
-    addnote "  exporting module: " & myobj.fullname, batch:=true
     oapplication.saveastext acmodule, myobj.fullname, sexportpath & "\Modules\" & myobj.fullname & ".bas"
     normalizeexportfile sexportpath & "\Modules\" & myobj.fullname & ".bas"
 next
-flushnotes
 
 ' --- macros ---
+addnote "       exporting macros"
 for each myobj in oapplication.currentproject.allmacros
-    addnote "  exporting macro: " & myobj.fullname, batch:=true
     oapplication.saveastext acmacro, myobj.fullname, sexportpath & "\Macros\" & myobj.fullname & ".mod"
-    normalizeexportfile sexportpath & "\Macros\" & myobj.fullname & ".mod"
+    'normalizeexportfile sexportpath & "\Macros\" & myobj.fullname & ".mod"
 next
 flushnotes
 
 ' --- reports ---
+addnote "       exporting reports"
 for each myobj in oapplication.currentproject.allreports
-    addnote "  exporting report: " & myobj.fullname, batch:=true
     if left(myobj.fullname, 1) = "s" then
         oapplication.saveastext acreport, myobj.fullname, sexportpath & "\Reports\SubReports\" & myobj.fullname & ".rpt"
-        normalizeexportfile sexportpath & "\Reports\SubReports\" & myobj.fullname & ".rpt"
+        'normalizeexportfile sexportpath & "\Reports\SubReports\" & myobj.fullname & ".rpt"
     else
         oapplication.saveastext acreport, myobj.fullname, sexportpath & "\Reports\" & myobj.fullname & ".rpt"
-        normalizeexportfile sexportpath & "\Reports\" & myobj.fullname & ".rpt"
+        'normalizeexportfile sexportpath & "\Reports\" & myobj.fullname & ".rpt"
     end if
 next
 flushnotes
 
 ' --- queries ---
+addnote "       exporting queries"
 ' write .sql files for all queries (fast, good for diffs).
 ' also write .qry via saveastext for passthrough queries only (createquerydef can't handle them).
 for each myobj in oapplication.currentdb.querydefs
     if left(myobj.name, 3) = "~sq" then goto nextquery  ' skip form-embedded queries
-    addnote "  exporting query: " & myobj.name, batch:=true
     if left(myobj.name, 1) = "s" then
         writetotextfile sexportpath & "\Queries\SubQueries\" & myobj.name & ".sql", myobj.sql
         if myobj.type = dbqsqlpassthrough then
@@ -685,25 +683,23 @@ for each myobj in oapplication.currentdb.querydefs
     end if
 nextquery:
 next
-flushnotes
 
 ' --- vb project information ---
-addnote "  exporting vbproject information", batch:=true
+addnote "       exporting vbproject information"
 dim dictsubvalues as object, dictbody as object
 set dictsubvalues = createobject("Scripting.Dictionary")
 set dictbody = createobject("Scripting.Dictionary")
 
 for each myobj in oapplication.vbe.activevbproject.references
-    addnote "  " & myobj.name & " " & myobj.major & "." & myobj.minor, batch:=true
     dictsubvalues.add myobj.name & " " & myobj.major & "." & myobj.minor, myobj.fullpath
 next
 
 dictbody.add "project-name", oapplication.vbe.activevbproject.name
 dictbody.add "vb-references", dictsubvalues
 writetotextfile sexportpath & "\VBproject\VBproject-properties.json", tojson(dictbody)
-flushnotes
 
 ' cleanup
+addnote "Cleaning up..."
 set myobj = nothing
 oapplication.closecurrentdatabase
 oapplication.quit

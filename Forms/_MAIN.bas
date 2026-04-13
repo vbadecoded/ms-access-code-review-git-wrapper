@@ -162,7 +162,7 @@ next
 '----------------------------
 
 '---auto select repo if only one---
-if not rsrepos.eof then
+if rsrepos.recordcount = 1 then
     me.cmdrepo = rsrepos!repolocation & "\"
     call getrepoinfo(rsrepos!repolocation & "\")
 else
@@ -171,7 +171,7 @@ else
     dim rslu as recordset
     set rslu = db.openrecordset("SELECT * from tblLastUsed WHERE recordId = 1")
     if nz(rslu!repolocation, "") = "" then goto lunotfound 'blank field
-    set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & rslu!repolocation & "'")
+    set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & rslu!repolocation & "\" & "'")
     if rsfindrepo.recordcount = 1 then 'last used repo found!!
         me.cmdrepo = rslu!repolocation
         call getrepoinfo(rslu!repolocation)
@@ -280,15 +280,23 @@ for each item in arr
     if instr(item, "Changes to be committed") then itemstatus = "staged"
     if instr(item, "Changes not staged for commit") then itemstatus = "unstaged"
     if instr(item, "Untracked files") then itemstatus = "new"
+    if instr(item, "deleted") then itemstatus = "deleted"
     if instr(item, "modified:") then
         rsfiles.addnew
-        rsfiles!location = trim(replace(item, "modified:", ""))
+        rsfiles!location = trim(replace(replace(item, "modified:", ""), chr(9), ""))
         rsfiles!filestatus = itemstatus
         rsfiles.update
     elseif itemstatus = "new" then
         if fso.fileexists(me.cmdrepo & replace(item, chr(9), "")) then
             rsfiles.addnew
-            rsfiles!location = trim(replace(item, "modified:", ""))
+            rsfiles!location = replace(replace(item, "modified:", ""), chr(9), "")
+            rsfiles!filestatus = itemstatus
+            rsfiles.update
+        end if
+    elseif itemstatus = "deleted" then
+        if len(replace(replace(item, "deleted:", ""), chr(9), "")) > 1 then
+            rsfiles.addnew
+            rsfiles!location = replace(replace(item, "deleted:", ""), chr(9), "")
             rsfiles!filestatus = itemstatus
             rsfiles.update
         end if
@@ -482,32 +490,7 @@ private sub recomposesendfile_click()
 formstatus (true)
 set fso = createobject("Scripting.FileSystemObject")
 
-'---add all changes files to list---
-dim results as string
-results = rungitcmd("git status")
-
-dim dbrecomp as database
-set dbrecomp = currentdb()
-dbrecomp.execute "DELETE * FROM tblFiles", dbfailonerror
-
-dim arr() as string
-arr = split(results, vblf)
-
-dim item
-dim rsrecomp as dao.recordset
-set rsrecomp = dbrecomp.openrecordset("tblFiles", dbopendynaset, dbappendonly)
-
-for each item in arr
-    if instr(item, "modified:") then
-        rsrecomp.addnew
-        rsrecomp!location = trim(replace(item, "modified:", "")) & " "
-        rsrecomp.update
-    end if
-next item
-
-rsrecomp.close
-set rsrecomp = nothing
-set dbrecomp = nothing
+recomposeaccdb
 
 formstatus (false)
 end sub

@@ -1,7 +1,7 @@
 ÿþversion =21
 versionrequired =20
 publishoption =1
-checksum =434460891
+checksum =-806894558
 begin form
     popup = notdefault
     recordselectors = notdefault
@@ -21,11 +21,11 @@ begin form
     gridy =24
     width =4980
     datasheetfontheight =11
-    itemsuffix =163
-    left =2805
-    top =3945
-    right =7830
-    bottom =12825
+    itemsuffix =164
+    left =2610
+    top =3030
+    right =23535
+    bottom =15345
     datasheetgridlinescolor =14211288
     recsrcdt = begin
         0x405599111372e640
@@ -195,7 +195,7 @@ begin form
     prtdevnames = begin
         0x080029003f000100000000000000000000000000000000000000000000000000 ,
         0x0000000000000000000000000000000000000000000000000000000000000031 ,
-        0x302e3130362e3234392e31320000000000
+        0x302e3130362e3234392e313200
     end
     onload ="=setTheme([Form])"
     filteronload =0
@@ -211,12 +211,12 @@ begin form
     alternatebackthemecolorindex =1
     alternatebackshade =95.0
     prtdevmodew = begin
-        0x000000000000000050012f90d601000002010000000000000201000000000000 ,
-        0x020100000000000000002f90d601000000002f90d6010000a9e2e4cefc7f0000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x45005300490047004e0000002d0044003300440030002d003400420036000000 ,
         0x01040020dc000c125fff800101000100ea0a6f08640001000700580201000100 ,
-        0x5802030001000000b05f2f90d60100000201000000000000d2eae4cefc7f0000 ,
-        0xa05f2f90d601000000002f90d601000000000000000000006fdfe5cefc7f0000 ,
-        0x7f000000d6010000000000000000000000000000000000000000000001000000 ,
+        0x5802030001000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001000000 ,
         0x0200000000020000010000000000000000000000000000000000000031304452 ,
         0xd6e70a3c1286f756000000004f040000789c7554cb72db300cfc179f7b883b4d ,
         0xdbe467343009496c4082c3871fe9f4dfbba464cb8d9b9b885d2cc005a8dfbb5c ,
@@ -369,7 +369,7 @@ begin form
         0x0000000000000000000000000000000000000000000000000000000000000000 ,
         0x0000000000000000000000000000000000000000000000000000000000000000 ,
         0x00000000000000000000000000000000000000000000310030002e0031003000 ,
-        0x36002e003200340039002e003100320000000000000000000000
+        0x36002e003200340039002e00310032000000
     end
     nosavectiwhendisabled =1
     begin
@@ -591,9 +591,9 @@ begin form
                     backstyle =1
                     overlapflags =85
                     textalign =2
-                    left =3300
+                    left =2640
                     top =60
-                    width =1440
+                    width =780
                     height =300
                     fontweight =700
                     backcolor =1270929
@@ -605,9 +605,9 @@ begin form
                     guid = begin
                         0xed59849865173c4ca22759f5b1cd20e3
                     end
-                    layoutcachedleft =3300
+                    layoutcachedleft =2640
                     layoutcachedtop =60
-                    layoutcachedwidth =4740
+                    layoutcachedwidth =3420
                     layoutcachedheight =360
                     themefontindex =-1
                     backthemecolorindex =-1
@@ -622,9 +622,9 @@ begin form
                     backstyle =1
                     overlapflags =85
                     textalign =2
-                    left =1740
+                    left =1620
                     top =60
-                    width =1440
+                    width =960
                     height =300
                     fontweight =700
                     backcolor =6836282
@@ -636,9 +636,9 @@ begin form
                     guid = begin
                         0xa625becca846b84eb985d98a56869479
                     end
-                    layoutcachedleft =1740
+                    layoutcachedleft =1620
                     layoutcachedtop =60
-                    layoutcachedwidth =3180
+                    layoutcachedwidth =2580
                     layoutcachedheight =360
                     themefontindex =-1
                     backthemecolorindex =-1
@@ -653,9 +653,9 @@ begin form
                     backstyle =1
                     overlapflags =85
                     textalign =2
-                    left =180
+                    left =300
                     top =60
-                    width =1440
+                    width =1260
                     height =300
                     fontweight =700
                     backcolor =6571103
@@ -667,9 +667,40 @@ begin form
                     guid = begin
                         0x998d77874ca5464d98e1751655cfd39b
                     end
-                    layoutcachedleft =180
+                    layoutcachedleft =300
                     layoutcachedtop =60
-                    layoutcachedwidth =1620
+                    layoutcachedwidth =1560
+                    layoutcachedheight =360
+                    themefontindex =-1
+                    backthemecolorindex =-1
+                    borderthemecolorindex =-1
+                    bordertint =100.0
+                    bordershade =65.0
+                    forethemecolorindex =-1
+                    foretint =100.0
+                    foreshade =95.0
+                end
+                begin label
+                    backstyle =1
+                    overlapflags =85
+                    textalign =2
+                    left =3480
+                    top =60
+                    width =1080
+                    height =300
+                    fontweight =700
+                    backcolor =3751056
+                    bordercolor =6647416
+                    forecolor =16777215
+                    name ="Label163"
+                    caption ="deleted"
+                    fontname ="Segoe UI"
+                    guid = begin
+                        0xb7377467c197ac478839c146f44b624d
+                    end
+                    layoutcachedleft =3480
+                    layoutcachedtop =60
+                    layoutcachedwidth =4560
                     layoutcachedheight =360
                     themefontindex =-1
                     backthemecolorindex =-1
@@ -738,7 +769,7 @@ begin form
                     foretint =100.0
                     foreshade =95.0
                     conditionalformat14 = begin
-                        0x010003000000010000000000000001010000f3f0f6005f446400170000005b00 ,
+                        0x010004000000010000000000000001010000f3f0f6005f446400170000005b00 ,
                         0x660069006c0065005300740061007400750073005d003d00220075006e007300 ,
                         0x7400610067006500640022000000000000000000000000000000000000000000 ,
                         0x00010000000000000001010000eff2f7003a506800150000005b00660069006c ,
@@ -746,7 +777,10 @@ begin form
                         0x0022000000000000000000000000000000000000000000000100000000000000 ,
                         0x01010000fefbf80091641300120000005b00660069006c006500530074006100 ,
                         0x7400750073005d003d0022006e00650077002200000000000000000000000000 ,
-                        0x000000000000000000
+                        0x000000000000000000010000000000000001010000ffffff00903c3900160000 ,
+                        0x005b00660069006c0065005300740061007400750073005d003d002200640065 ,
+                        0x006c006500740065006400220000000000000000000000000000000000000000 ,
+                        0x0000
                     end
                 end
                 begin commandbutton
@@ -1032,10 +1066,10 @@ end sub
 private sub stage_click()
 
 if me.filestatus <> "staged" then
-    call rungitcmd("git add " & me.location)
+    call rungitcmd("git add """ & trim(me.location) & """")
     call form__main.gitstatus_click
 else
-    call rungitcmd("git reset " & me.location)
+    call rungitcmd("git reset """ & trim(me.location) & """")
     call form__main.gitstatus_click
 end if
 
