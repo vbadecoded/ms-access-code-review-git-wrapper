@@ -1,6 +1,13 @@
 option compare database
 option explicit
 
+function addlastslash(inputtxt as string) as string
+
+addlastslash = inputtxt
+if not right(inputtxt, 1) = "\" then addlastslash = inputtxt & "\"
+
+end function
+
 function setsplashloading(label as string)
 
 if isnull(tempvars!loadamount) then exit function

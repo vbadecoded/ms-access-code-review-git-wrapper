@@ -14,7 +14,7 @@ if not cleandatabase then exit sub
 doevents
 
 ' decompose handles shift bypass internally   no need for user to hold shift
-call decomposeaccdb(form__main.cmdrepo & me.cmdrepo.column(2), form__main.cmdrepo)
+call decomposeaccdb(form_sfrmrepo.cmdrepo & form_sfrmrepo.cmdrepo.column(2), form_sfrmrepo.cmdrepo)
 
 formstatus (false)
 end sub
@@ -34,23 +34,14 @@ set db = nothing
 formstatus (false)
 end sub
 
-private sub cmdrepo_afterupdate()
-formstatus (true)
-
-call getrepoinfo(me.cmdrepo)
-call gitstatus_click
-
-formstatus (false)
-end sub
-
 private sub createaccde_click()
 formstatus (true)
 
 dim filepath as string
 dim oldname as string, newname as string
 
-filepath = form__main.cmdrepo
-oldname = me.cmdrepo.column(2)
+filepath = form_sfrmrepo.cmdrepo
+oldname = form_sfrmrepo.cmdrepo.column(2)
 newname = left(oldname, len(oldname) - 1) & "e"
 
 dim oaccess as object
@@ -68,7 +59,7 @@ end sub
 private sub decompose_click()
 formstatus (true)
 
-call decomposeaccdb(form__main.cmdrepo & me.cmdrepo.column(2), form__main.cmdrepo)
+call decomposeaccdb(form_sfrmrepo.cmdrepo & form_sfrmrepo.cmdrepo.column(2), form_sfrmrepo.cmdrepo)
 
 formstatus (false)
 end sub
@@ -76,7 +67,7 @@ end sub
 private sub disableshift_click()
 formstatus (true)
 
-if shiftkeybypass(getdb, false) then addnote me.cmdrepo.column(2) & " Shift Key Disabled"
+if shiftkeybypass(getdb, false) then addnote form_sfrmrepo.cmdrepo.column(2) & " Shift Key Disabled"
 
 formstatus (false)
 end sub
@@ -84,7 +75,7 @@ end sub
 private sub enableshift_click()
 formstatus (true)
 
-if shiftkeybypass(getdb, true) then addnote me.cmdrepo.column(2) & " Shift Key Enabled"
+if shiftkeybypass(getdb, true) then addnote form_sfrmrepo.cmdrepo.column(2) & " Shift Key Enabled"
 
 formstatus (false)
 end sub
@@ -163,7 +154,7 @@ next
 
 '---auto select repo if only one---
 if rsrepos.recordcount = 1 then
-    me.cmdrepo = rsrepos!repolocation & "\"
+    form_sfrmrepo.cmdrepo = rsrepos!repolocation & "\"
     call getrepoinfo(rsrepos!repolocation & "\")
 else
 '---if more than one repo found, check tbllastused---
@@ -171,12 +162,15 @@ else
     dim rslu as recordset
     set rslu = db.openrecordset("SELECT * from tblLastUsed WHERE recordId = 1")
     if nz(rslu!repolocation, "") = "" then goto lunotfound 'blank field
-    set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & rslu!repolocation & "\" & "'")
+    set rsfindrepo = db.openrecordset("SELECT * FROM tblRepoLocation WHERE repoLocation = '" & addlastslash(rslu!repolocation) & "'")
     if rsfindrepo.recordcount = 1 then 'last used repo found!!
-        me.cmdrepo = rslu!repolocation
-        call getrepoinfo(rslu!repolocation)
+        form_sfrmrepo.cmdrepo = addlastslash(rslu!repolocation)
+        call getrepoinfo(addlastslash(rslu!repolocation))
+        
+        form_sfrmrepo.filter = "repoLocation = '" & addlastslash(rslu!repolocation) & "'"
+        form_sfrmrepo.filteron = true
+        if nz(form_sfrmrepo.repolocation, "") = "" then form_sfrmrepo.repolocation = addlastslash(rslu!repolocation)
     end if
-    
 lunotfound:
 end if
 
@@ -199,118 +193,7 @@ dbinit.execute "INSERT INTO tblReleaseTracking(task) VALUES('Form Initialized')"
 set dbinit = nothing
 me.sfrmtracking.requery
 
-call me.gitstatus_click
-
-formstatus (false)
-end sub
-
-private sub gitbranch_afterupdate()
-formstatus (true)
-
-addnote "git checkout " & me.gitbranch
-
-call rungitcmd("git checkout " & me.gitbranch)
-call gitstatus_click
-
-formstatus (false)
-end sub
-
-private sub gitcommit_click()
-formstatus (true)
-
-addnote "git commit -m """ & me.releasenotes & """"
-call rungitcmd("git commit -m """ & me.releasenotes & """")
-call me.gitstatus_click
-
-formstatus (false)
-end sub
-
-private sub gitmerge_click()
-formstatus (true)
-
-addnote "git merge " & me.gitbranchselect
-call rungitcmd("git merge " & me.gitbranchselect)
-
-formstatus (false)
-end sub
-
-private sub gitpull_click()
-formstatus (true)
-
-addnote "git pull origin " & me.gitbranch
-call rungitcmd("git pull origin " & me.gitbranch)
-
-formstatus (false)
-end sub
-
-private sub gitpush_click()
-formstatus (true)
-
-addnote "git push origin " & me.gitbranch
-call rungitcmd("git push origin " & me.gitbranch)
-
-formstatus (false)
-end sub
-
-public sub gitstatus_click()
-formstatus (true)
-
-addnote "git status"
-
-'add all modified files
-dim results as string
-results = rungitcmd("git status", printall:=false)
-
-dim dbstatus as database
-set dbstatus = currentdb()
-dbstatus.execute "DELETE * FROM tblFiles", dbfailonerror
-dbstatus.execute "DELETE * FROM tblDiff", dbfailonerror
-
-dim fso as object
-set fso = createobject("Scripting.FileSystemObject")
-
-dim arr() as string
-arr = split(results, vblf)
-
-dim item, itemstatus as string
-dim rsfiles as dao.recordset
-set rsfiles = dbstatus.openrecordset("tblFiles", dbopendynaset, dbappendonly)
-
-for each item in arr
-    if instr(item, "Changes to be committed") then itemstatus = "staged"
-    if instr(item, "Changes not staged for commit") then itemstatus = "unstaged"
-    if instr(item, "Untracked files") then itemstatus = "new"
-    if instr(item, "deleted") then itemstatus = "deleted"
-    if instr(item, "modified:") then
-        rsfiles.addnew
-        rsfiles!location = trim(replace(replace(item, "modified:", ""), chr(9), ""))
-        rsfiles!filestatus = itemstatus
-        rsfiles.update
-    elseif itemstatus = "new" then
-        if fso.fileexists(me.cmdrepo & replace(item, chr(9), "")) then
-            rsfiles.addnew
-            rsfiles!location = replace(replace(item, "modified:", ""), chr(9), "")
-            rsfiles!filestatus = itemstatus
-            rsfiles.update
-        end if
-    elseif itemstatus = "deleted" then
-        if len(replace(replace(item, "deleted:", ""), chr(9), "")) > 1 then
-            rsfiles.addnew
-            rsfiles!location = replace(replace(item, "deleted:", ""), chr(9), "")
-            rsfiles!filestatus = itemstatus
-            rsfiles.update
-        end if
-    end if
-next item
-
-rsfiles.close
-set rsfiles = nothing
-set dbstatus = nothing
-
-set fso = nothing
-
-me.sfrmfiles.requery
-me.sfrmdiff.requery
+call form_sfrmrepo.gitstatus_click
 
 formstatus (false)
 end sub
@@ -352,18 +235,6 @@ addnote "Rev Increased to " & newrel
 formstatus (false)
 end sub
 
-function formstatus(inwork as boolean)
-
-if inwork then
-    me.detail.backcolor = rgb(50, 0, 0)
-else
-    call settheme(me)
-end if
-
-me.coderunning.visible = inwork
-
-end function
-
 private sub notifydepartment_afterupdate()
 formstatus (true)
 
@@ -381,7 +252,7 @@ do while not rs.eof
     rs.movenext
 loop
 
-call genemail(strbcc:=emails, strsubject:="WorkingDB Update Released", body:=me.releasenotes)
+call genemail(strbcc:=emails, strsubject:="WorkingDB Update Released", body:=form_sfrmrepo.releasenotes)
 
 rs.close
 set rs = nothing
@@ -401,7 +272,7 @@ dim rs as recordset
 set db = opendatabase("\\data\mdbdata\WorkingDB\_docs\Reporting\WorkingDB_ForExcel.accdb", , true)
 set rs = db.openrecordset("SELECT * FROM tblPermissions WHERE user = '" & me.notifyuser & "'")
 
-call genemail(strto:=rs!useremail, strsubject:="WorkingDB Update Released", body:=me.releasenotes)
+call genemail(strto:=rs!useremail, strsubject:="WorkingDB Update Released", body:=form_sfrmrepo.releasenotes)
 
 rs.close
 set rs = nothing
@@ -416,16 +287,7 @@ private sub openaccdb_click()
 formstatus (true)
 
 call openpath(getdb)
-addnote me.cmdrepo.column(2) & " Opened"
-
-formstatus (false)
-end sub
-
-private sub opengitgui_click()
-formstatus (true)
-
-addnote "git gui"
-call rungitcmd("git gui")
+addnote form_sfrmrepo.cmdrepo.column(2) & " Opened"
 
 formstatus (false)
 end sub
@@ -436,15 +298,6 @@ formstatus (true)
 addnote "open theme editor"
 
 docmd.openform "frmThemeEditor"
-
-formstatus (false)
-end sub
-
-private sub publishchanges_click()
-formstatus (true)
-
-addnote "git pull origin master : " & me.cmdrepo.column(1)
-call rungitcmd("git pull origin master", me.cmdrepo.column(1))
 
 formstatus (false)
 end sub
@@ -463,23 +316,7 @@ formstatus (true)
 currentdb.execute "INSERT INTO " & me.revisiontablename & _
     "(DatabaseVersion,Notes,ReleaseDate,ReleasedBy,DatabaseName)" & _
     " VALUES" & _
-    "('" & me.releasenum & "','" & me.releasenotes & "','" & date & "','" & me.responsibleperson & "','" & me.cmdrepo.column(2) & "');", dbfailonerror
-
-dim body, strvalues
-addnote "Generate notification email"
-body = emailcontentgen("New Version Published", me.cmdrepo.column(2) & " " & me.releasenum & " Published", "Notes: " & replace(me.releasenotes, ",", ";"), "Responsible: " & responsibleperson, "Releaser: " & environ("username"), "", "")
-
-if environ("username") <> "brownj" then
-    strvalues = "'brownj','brownj@us.nifco.com','" & environ("username") & "','" & getemail(environ("username")) & "','" & now() & "',1,1,'New Version Published','" & body & "','" & now() & "'"
-    currentdb.execute "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strvalues & ");", dbfailonerror
-    addnote "Notification sent to brownj"
-end if
-
-if environ("username") <> "georgemi" then
-    strvalues = "'georgemi','georgemi@us.nifco.com','" & environ("username") & "','" & getemail(environ("username")) & "','" & now() & "',1,1,'New Version Published','" & body & "','" & now() & "'"
-    currentdb.execute "INSERT INTO tblNotificationsSP(recipientUser,recipientEmail,senderUser,senderEmail,sentDate,notificationType,notificationPriority,notificationDescription,emailContent,readDate) VALUES(" & strvalues & ");", dbfailonerror
-    addnote "Notification sent to georgemi"
-end if
+    "('" & me.releasenum & "','" & form_sfrmrepo.releasenotes & "','" & date & "','" & me.responsibleperson & "','" & form_sfrmrepo.cmdrepo.column(2) & "');", dbfailonerror
 
 addnote "Version " & me.releasenum & " Notes Published Successfully"
 
@@ -510,16 +347,6 @@ formstatus (true)
 if me.dirty then me.dirty = false
 me.useremail = getemail(me.responsibleperson)
 addnote "Populated User Email"
-
-formstatus (false)
-end sub
-
-private sub stagechanged_click()
-formstatus (true)
-addnote "git add ."
-
-call rungitcmd("git add .")
-call gitstatus_click
 
 formstatus (false)
 end sub

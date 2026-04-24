@@ -23,6 +23,8 @@ if commandbars("Ribbon").height > 100 then commandbars.executemso "MinimizeRibbo
 
 call setsplashloading("Loading...")
 
+relinksqltables
+
 'set up theme
 dim themeid as long
 themeid = nz(dlookup("themeId", "tblParameters"), 0)

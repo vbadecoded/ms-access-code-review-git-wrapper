@@ -3,13 +3,25 @@ option explicit
 
 private declare ptrsafe sub sleep lib "kernel32" (byval dwmilliseconds as long)
 
+public function formstatus(inwork as boolean)
+
+if inwork then
+    form__main.detail.backcolor = rgb(50, 0, 0)
+else
+    call settheme(form__main)
+end if
+
+form__main.coderunning.visible = inwork
+
+end function
+
 function cleandatabase() as boolean
 
 cleandatabase = false
 
 ' --- validation ---
 dim errormsg as new collection
-if nz(form__main.releasenotes, "") = "" then errormsg.add "Empty release notes"
+if nz(form_sfrmrepo.releasenotes, "") = "" then errormsg.add "Empty release notes"
 
 if errormsg.count > 0 then
     dim msgcontents as string, item
@@ -22,7 +34,7 @@ end if
 
 if msgbox("Are you sure? ", vbyesno, "Just Checking") = vbno then exit function
 
-addnote "--- STARTING " & form__main.cmdrepo.column(2) & " CLEANING PROCEDURE ---"
+addnote "--- STARTING " & form_sfrmrepo.cmdrepo.column(2) & " CLEANING PROCEDURE ---"
 
 ' --- setup variables (safe add — remove first if exists) ---
 addnote "Establishing variables..."
@@ -31,12 +43,12 @@ dim fso as object
 set fso = createobject("Scripting.FileSystemObject")
 
 dim repoloc as string, devfile as string, dbname as string
-repoloc = form__main.cmdrepo
+repoloc = form_sfrmrepo.cmdrepo
 devfile = getdb
-dbname = form__main.cmdrepo.column(2)
+dbname = form_sfrmrepo.cmdrepo.column(2)
 
 safeaddtempvar "releaseNum", form__main.releasenum.value
-safeaddtempvar "releaseNotes", replace(form__main.releasenotes.value, "'", "''")
+safeaddtempvar "releaseNotes", replace(form_sfrmrepo.releasenotes.value, "'", "''")
 safeaddtempvar "responsiblePerson", form__main.responsibleperson.value
 safeaddtempvar "userEmail", form__main.useremail.value
 safeaddtempvar "databaseName", dbname
@@ -67,20 +79,6 @@ if dbname = "WorkingDB_FE.accdb" then
     dbinput.closecurrentdatabase
     dbinput.quit
     set dbinput = nothing
-    
-    ' backup backends
-    dim dbloc as string, bebackup as string
-    dbloc = "\\data\mdbdata\WorkingDB\"
-    bebackup = dbloc & "_backups\prod-BE\"
-    
-    addnote "Backup backends"
-    dim befiles as variant
-    befiles = array("WorkingDB_BE.accdb", "WorkingDB_BE_DesignE.accdb", "WorkingDB_BE_ProjectE.accdb")
-    
-    dim i as long
-    for i = lbound(befiles) to ubound(befiles)
-        fso.copyfile dbloc & "prod-BE\" & befiles(i), bebackup & tempvars!releasenum & "_" & befiles(i)
-    next i
 end if
 
 ' --- enable shift bypass + decompile in one access instance ---
@@ -162,22 +160,22 @@ function getrepoinfo(repolocation as string) as boolean
 getrepoinfo = false
 
 if form__main.trackrevisions then
-    addnote "Getting " & form__main.cmdrepo & " latest revision"
+    addnote "Getting " & form_sfrmrepo.cmdrepo & " latest revision"
     
     dim maxrel as variant
-    maxrel = dmax("ID", form__main.revisiontablename, "databaseName = '" & form__main.cmdrepo.column(2) & "'")
+    maxrel = dmax("ID", form__main.revisiontablename, "databaseName = '" & form_sfrmrepo.cmdrepo.column(2) & "'")
     
     form__main.releasenum = dlookup("DatabaseVersion", form__main.revisiontablename, "ID = " & nz(maxrel, 0))
 end if
 
 'find current branch
-form__main.gitbranch = rungitcmd("git branch --show-current")
+form_sfrmrepo.gitbranch = rungitcmd("git branch --show-current")
 
 'list branches
-form__main.gitbranch.rowsource = replace(replace(rungitcmd("git branch"), vblf, ";"), "*", "")
-form__main.gitbranchselect.rowsource = form__main.gitbranch.rowsource
+form_sfrmrepo.gitbranch.rowsource = replace(replace(rungitcmd("git branch"), vblf, ";"), "*", "")
+form_sfrmrepo.gitbranchselect.rowsource = form_sfrmrepo.gitbranch.rowsource
 
-form__main.publishchanges.visible = nz(form__main.cmdrepo.column(1), "") <> ""
+form_sfrmrepo.publishchanges.visible = nz(form_sfrmrepo.cmdrepo.column(1), "") <> ""
 
 currentdb.execute "UPDATE tblLastUsed SET repoLocation = '" & repolocation & "' WHERE recordId = 1", dbfailonerror
 
@@ -185,7 +183,7 @@ getrepoinfo = true
 end function
 
 function getdb() as string
-getdb = form__main.cmdrepo & form__main.cmdrepo.column(2)
+getdb = form_sfrmrepo.cmdrepo & form_sfrmrepo.cmdrepo.column(2)
 end function
 
 function shiftkeybypass(location as string, toggle as boolean) as boolean
@@ -193,7 +191,7 @@ shiftkeybypass = false
 on error goto errhandler
 
 dim db as dao.database
-dim acc as object
+dim acc
 dim prop as dao.property
 const conpropnotfound = 3270
   
@@ -233,9 +231,9 @@ dim stroutput as string, strerror as string
 
 ' set the working directory to your git repository
 rungitcmd = ""
-if isnull(form__main.cmdrepo) then exit function
+if isnull(form_sfrmrepo.cmdrepo) then exit function
 if dir = "current" then
-    sworkingdirectory = form__main.cmdrepo
+    sworkingdirectory = form_sfrmrepo.cmdrepo
 else
     sworkingdirectory = dir
 end if
@@ -245,7 +243,7 @@ wsshell.currentdirectory = sworkingdirectory
 
 select case inputcmd
     case "git commit -a"
-        inputcmd = inputcmd & " -m """ & form__main.releasenotes & """"
+        inputcmd = inputcmd & " -m """ & form_sfrmrepo.releasenotes & """"
 end select
 
 ' use .run with hidden window (0) and redirect stdout + stderr to temp files
@@ -352,13 +350,13 @@ dim fso as object
 set fso = createobject("Scripting.FileSystemObject")
 
 dim repo as string, dbsource as string, importto as string
-repo = form__main.cmdrepo
-dbsource = repo & form__main.cmdrepo.column(2)
+repo = form_sfrmrepo.cmdrepo
+dbsource = repo & form_sfrmrepo.cmdrepo.column(2)
 
 ' create a working copy of the .accdb to import into
 importto = repo & "recompose_temp.accdb"
 if fso.fileexists(importto) then fso.deletefile importto
-addnote "Copying " & form__main.cmdrepo.column(2) & " to temp file..."
+addnote "Copying " & form_sfrmrepo.cmdrepo.column(2) & " to temp file..."
 fso.copyfile dbsource, importto
 
 ' ask user: import all modified files or only selected?

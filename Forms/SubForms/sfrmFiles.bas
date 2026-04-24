@@ -50,10 +50,10 @@ private sub stage_click()
 
 if me.filestatus <> "staged" then
     call rungitcmd("git add """ & trim(me.location) & """")
-    call form__main.gitstatus_click
+    call form_sfrmrepo.gitstatus_click
 else
     call rungitcmd("git reset """ & trim(me.location) & """")
-    call form__main.gitstatus_click
+    call form_sfrmrepo.gitstatus_click
 end if
 
 
