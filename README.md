@@ -58,7 +58,7 @@
 	```bash
 	git status
 	```
- *Before you start working, make sure you are on the correct GIT branch*
+- Before you start working, make sure you are on the correct GIT branch
 4. Click "Enable Shift" to allow using Shift Bypass on Database
 5. Shift + Click "Open Database" to bypass startup procedures
 6. Do your work on the MS Access Database
